@@ -93,6 +93,103 @@ else
 fi
 
 # -------------------------------------------------------
+# Create HA-specific Copilot instructions
+# -------------------------------------------------------
+bashio::log.info "Writing Copilot instructions for Home Assistant..."
+mkdir -p /homeassistant/.github
+cat > /homeassistant/.github/copilot-instructions.md << 'INSTREOF'
+# Home Assistant — Copilot Instructions
+
+You are running inside a Home Assistant add-on container. Your primary job is to
+help the user manage and improve their Home Assistant installation.
+
+## Path Mapping
+
+In this container, paths are mapped differently than HA Core:
+
+| Path              | Description              | Access     |
+|-------------------|--------------------------|------------|
+| `/homeassistant`  | HA configuration dir     | read-write |
+| `/share`          | Shared folder            | read-write |
+| `/media`          | Media files              | read-only  |
+| `/ssl`            | SSL certificates         | read-only  |
+
+**Important:** `/homeassistant` is the HA config directory (equivalent to
+`/config` in HA Core). When users mention `/config/...`, translate to
+`/homeassistant/...`. The path `/config` does NOT exist in this container.
+
+## Key Configuration Files
+
+| File                                    | Purpose                              |
+|-----------------------------------------|--------------------------------------|
+| `/homeassistant/configuration.yaml`     | Main HA configuration                |
+| `/homeassistant/automations.yaml`       | Automations (list format)            |
+| `/homeassistant/scripts.yaml`           | Scripts                              |
+| `/homeassistant/scenes.yaml`            | Scenes                               |
+| `/homeassistant/secrets.yaml`           | Secrets (DO NOT display contents)    |
+| `/homeassistant/customize.yaml`         | Entity customizations                |
+| `/homeassistant/custom_components/`     | Custom integrations (HACS etc.)      |
+
+## Home Assistant MCP Server
+
+The `homeassistant` MCP server is pre-configured and gives you direct access to
+the Home Assistant API. Use it to:
+
+- **Query entity states:** Ask about sensor values, device states, etc.
+- **Control devices:** Turn lights on/off, set thermostats, lock doors, etc.
+- **List entities:** Discover what devices and entities are available.
+- **Call services:** Invoke any HA service (e.g., `light.turn_on`, `climate.set_temperature`).
+- **Get history:** Retrieve historical state data for entities.
+- **List automations:** See all configured automations and their states.
+- **Get error logs:** Check HA error logs for debugging.
+
+When the user asks about their smart home state, devices, or wants to control
+something, prefer using the MCP server over reading YAML files. The MCP server
+gives you live, real-time data.
+
+### Example MCP Usage Patterns
+
+- "What's the temperature in the living room?" → Use MCP to query the sensor entity
+- "Turn off all lights" → Use MCP to call `light.turn_off` service
+- "List all unavailable entities" → Use MCP to list entities and filter by state
+- "Why didn't my automation trigger?" → Use MCP to check automation state + read YAML for logic
+
+## Reading Home Assistant Logs
+
+**Via command line:**
+```bash
+# View recent logs (ha CLI — if installed)
+ha core logs 2>&1 | tail -100
+
+# Filter by keyword
+ha core logs 2>&1 | grep -i keyword
+
+# Read log file directly
+tail -100 /homeassistant/home-assistant.log
+```
+
+**Via MCP:** Use the `get_error_log` tool from the homeassistant MCP server.
+
+## YAML Editing Best Practices
+
+- Always validate YAML syntax before saving changes.
+- Use `!include` and `!include_dir_merge_list` patterns that HA supports.
+- Keep `secrets.yaml` separate — reference values with `!secret key_name`.
+- When editing automations, maintain the list format used by the UI editor.
+- After making config changes, remind the user to reload or restart HA:
+  - Minor changes: "Go to Developer Tools → YAML → Reload Automations"
+  - Major changes: "Restart Home Assistant for changes to take effect"
+
+## Security
+
+- NEVER display the contents of `secrets.yaml`.
+- NEVER display API tokens, passwords, or the SUPERVISOR_TOKEN.
+- When creating automations that control security devices (locks, alarms, garage
+  doors), always warn the user about safety implications.
+INSTREOF
+bashio::log.info "Copilot instructions written to /homeassistant/.github/copilot-instructions.md"
+
+# -------------------------------------------------------
 # Write environment file for tmux sessions
 # -------------------------------------------------------
 ENV_FILE=/data/copilot-env.sh

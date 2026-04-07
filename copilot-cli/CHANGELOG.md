@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.5
+
+- Add HA-specific `copilot-instructions.md` auto-generated at `/homeassistant/.github/`
+- Copilot now has full context on HA path mappings, config files, MCP usage, YAML best practices, and security rules
+
 ## 1.0.4
 
 - Fix 502 Bad Gateway: Switch from dynamic `ingress_port: 0` to fixed port `7681`
