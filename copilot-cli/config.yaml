@@ -1,6 +1,6 @@
 ---
 name: "GitHub Copilot CLI"
-version: "1.0.7"
+version: "1.0.8"
 slug: copilot_cli
 description: >-
   Run GitHub Copilot's AI coding agent directly in your Home Assistant

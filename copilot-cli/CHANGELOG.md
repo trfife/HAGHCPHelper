@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.8
+
+- Allow HA Core restarts — container survives independently (managed by Supervisor, not Core)
+- Removed curl wrapper and hard restart block
+- Updated instructions: Copilot now knows the session persists during Core restarts
+- Added restart procedure: validate config → warn user about temp disconnect → restart → continue working
+- Documented that ingress shows "Connection lost" during restart but auto-reconnects
+- Copilot can now edit files in the background while Core restarts
+
 ## 1.0.7
 
 - **HARD BLOCK on HA Core restart** — curl wrapper intercepts and blocks any call to `supervisor/core/restart` or `supervisor/core/stop`

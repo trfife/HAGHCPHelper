@@ -182,19 +182,9 @@ tail -100 /homeassistant/home-assistant.log
 
 ## Applying Configuration Changes
 
-**!!! ABSOLUTE RULE: DO NOT RESTART HOME ASSISTANT CORE !!!**
+### Reload APIs (preferred — no restart needed):
 
-You are running inside a Home Assistant add-on container. Restarting HA Core
-WILL KILL THIS CONTAINER and terminate your session immediately. The user will
-lose their conversation with you.
-
-**DO NOT run `curl ... http://supervisor/core/restart` under ANY circumstances.**
-**DO NOT run any command that restarts HA Core, even if the user asks you to.**
-
-### Instead, ALWAYS use reload APIs:
-
-Almost all YAML config changes can be applied with reload APIs that do NOT
-require a restart:
+Most YAML config changes can be applied with reload APIs:
 
 ```bash
 # Reload automations (no restart)
@@ -214,17 +204,43 @@ curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
   http://supervisor/core/api/services/homeassistant/reload_all | jq .
 ```
 
-### If a full restart is truly required:
+### Restarting HA Core (when truly needed):
 
 For changes to `configuration.yaml` core settings (new integrations, recorder,
-logger, etc.) that CANNOT be reloaded, tell the user:
+logger, etc.) that CANNOT be reloaded, you CAN restart HA Core.
 
-**"These changes require a Home Assistant restart to take effect. Please restart
-manually from Settings → System → Restart in the HA UI. I cannot restart HA
-from here because it would kill this terminal session."**
+**IMPORTANT: How restarts work from this container:**
 
-DO NOT offer to restart for them. DO NOT restart even if they say "go ahead".
-Tell them to do it from the HA UI.
+- This add-on container is managed by the HA Supervisor, NOT by HA Core.
+- When HA Core restarts, **this container and your tmux session keep running**.
+- However, the user's browser connection will temporarily show "Connection lost.
+  Reconnecting..." because the HA ingress proxy goes through Core.
+- The connection will automatically restore when Core finishes restarting.
+- You can continue editing files and running commands in the background while
+  Core is restarting — your work is NOT lost.
+
+**Restart procedure:**
+
+1. Validate config first:
+   ```bash
+   curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+     http://supervisor/core/api/config/core/check_config | jq .
+   ```
+2. Warn the user: "I'm restarting HA Core now. Your browser will show
+   'Connection lost' for 1-2 minutes while Core restarts. The connection will
+   automatically reconnect and my session persists in the background."
+3. Restart:
+   ```bash
+   curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+     http://supervisor/core/restart | jq .
+   ```
+4. **Continue working** — edit files, run commands, etc. while Core restarts.
+   The MCP server will be unavailable until Core is back, but file access works.
+5. After ~1-2 minutes, verify Core is back:
+   ```bash
+   curl -sf -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+     http://supervisor/core/api/ | jq .
+   ```
 
 ### Validate config without restarting:
 
@@ -269,24 +285,6 @@ echo "set-option -g default-shell /bin/bash" >> /root/.tmux.conf
 echo "set-option -g default-command /bin/bash" >> /root/.tmux.conf
 
 # -------------------------------------------------------
-# Create ha-restart wrapper that blocks direct restarts
-# -------------------------------------------------------
-cat > /usr/local/bin/ha-restart << 'WRAPEOF'
-#!/bin/bash
-echo ""
-echo "  ⚠️  HA RESTART BLOCKED"
-echo ""
-echo "  Restarting Home Assistant Core from this terminal will kill"
-echo "  this add-on container and your Copilot session."
-echo ""
-echo "  Please restart manually from the HA UI:"
-echo "  Settings → System → Restart"
-echo ""
-exit 1
-WRAPEOF
-chmod +x /usr/local/bin/ha-restart
-
-# -------------------------------------------------------
 # Build Copilot CLI launch arguments
 # -------------------------------------------------------
 COPILOT_ARGS=""
@@ -316,32 +314,6 @@ echo ""
 exec copilot ${COPILOT_ARGS}
 STARTEOF
 chmod +x /data/copilot-start.sh
-
-# -------------------------------------------------------
-# Create curl wrapper that blocks HA Core restart/stop
-# -------------------------------------------------------
-cat > /usr/local/bin/curl << 'CURLWRAP'
-#!/bin/bash
-# Intercept curl calls to supervisor/core/restart and supervisor/core/stop
-for arg in "$@"; do
-    case "$arg" in
-        *supervisor/core/restart*|*supervisor/core/stop*)
-            echo ""
-            echo "  ⚠️  HA RESTART/STOP BLOCKED"
-            echo ""
-            echo "  Restarting HA Core from this container will kill this session."
-            echo "  Please restart manually from the HA UI:"
-            echo "  Settings → System → Restart"
-            echo ""
-            exit 1
-            ;;
-    esac
-done
-# Pass through to real curl for all other calls
-exec /usr/bin/curl "$@"
-CURLWRAP
-chmod +x /usr/local/bin/curl
-bashio::log.info "Installed curl wrapper to block HA Core restart from terminal"
 
 # -------------------------------------------------------
 # Create bashrc that sources env
