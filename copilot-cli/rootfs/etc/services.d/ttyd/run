@@ -161,7 +161,7 @@ alias ha-logs="cat /homeassistant/home-assistant.log 2>/dev/null || echo 'Log no
 RCEOF
 
 # -------------------------------------------------------
-# Get dynamic ingress port from Supervisor
+# Get ingress port
 # -------------------------------------------------------
 ingress_port=$(bashio::addon.ingress_port)
 bashio::log.info "Starting ttyd on ingress port ${ingress_port}"
@@ -173,20 +173,22 @@ cd /homeassistant || cd /root
 
 if bashio::var.true "${SESSION_PERSIST}"; then
     exec ttyd \
-        -i 0.0.0.0 \
         -p "${ingress_port}" \
         -W \
+        --ping-interval 30 \
+        --max-clients 5 \
         -t fontSize="${FONT_SIZE}" \
         -t fontFamily="Monaco,Consolas,monospace" \
-        -t "theme={'background':'#0d1117','foreground':'#e6edf3','cursor':'#58a6ff'}" \
+        -t disableLeaveAlert=true \
         /bin/bash -c "exec tmux new-session -A -s ${SESSION_NAME} /data/copilot-start.sh"
 else
     exec ttyd \
-        -i 0.0.0.0 \
         -p "${ingress_port}" \
         -W \
+        --ping-interval 30 \
+        --max-clients 5 \
         -t fontSize="${FONT_SIZE}" \
         -t fontFamily="Monaco,Consolas,monospace" \
-        -t "theme={'background':'#0d1117','foreground':'#e6edf3','cursor':'#58a6ff'}" \
+        -t disableLeaveAlert=true \
         /data/copilot-start.sh
 fi

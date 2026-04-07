@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.4
+
+- Fix 502 Bad Gateway: Switch from dynamic `ingress_port: 0` to fixed port `7681`
+- Remove malformed theme option from ttyd (was using invalid single-quote JSON)
+- Add `--ping-interval 30` for WebSocket keepalive through HA ingress proxy
+- Add `--max-clients 5` safety limit
+- Remove `-i 0.0.0.0` explicit bind (let ttyd use default)
+- Install `procps` for healthcheck `pgrep` command
+
 ## 1.0.3
 
 - Fix: Explicit chmod +x in Dockerfile for s6 run script (Windows Docker builds strip execute bit)

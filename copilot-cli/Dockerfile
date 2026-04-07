@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     openssl \
     ripgrep \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Install GitHub Copilot CLI (standalone binary — no Node.js needed)
