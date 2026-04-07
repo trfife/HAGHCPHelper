@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.6
+
+- Add critical HA restart safety instructions to copilot-instructions.md
+- Copilot now knows restarting HA Core kills its own container/session
+- Instructions teach Copilot to use reload APIs instead of full restarts
+- Added reload commands for automations, scripts, scenes, and full YAML reload
+- Added config validation command
+- Clarified that /homeassistant files ARE the live config (no SCP needed)
+
 ## 1.0.5
 
 - Add HA-specific `copilot-instructions.md` auto-generated at `/homeassistant/.github/`

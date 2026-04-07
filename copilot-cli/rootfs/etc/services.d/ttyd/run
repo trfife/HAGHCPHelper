@@ -176,9 +176,57 @@ tail -100 /homeassistant/home-assistant.log
 - Use `!include` and `!include_dir_merge_list` patterns that HA supports.
 - Keep `secrets.yaml` separate — reference values with `!secret key_name`.
 - When editing automations, maintain the list format used by the UI editor.
-- After making config changes, remind the user to reload or restart HA:
-  - Minor changes: "Go to Developer Tools → YAML → Reload Automations"
-  - Major changes: "Restart Home Assistant for changes to take effect"
+- The files in `/homeassistant` are ALREADY the live HA config — you do NOT need
+  to SCP or copy files anywhere. Edits are applied directly.
+- After making config changes, tell the user how to apply them (see below).
+
+## Applying Configuration Changes
+
+**CRITICAL: You are running inside a Home Assistant add-on container. If you
+restart Home Assistant Core, YOUR CONTAINER WILL ALSO RESTART and this terminal
+session will be killed. The user will see "Connection lost. Reconnecting..."**
+
+### What to do instead:
+
+1. **For automations, scripts, scenes, groups, input_*:** Use the reload API
+   which does NOT restart HA Core:
+   ```bash
+   # Reload automations only (no restart needed)
+   curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+     http://supervisor/core/api/services/automation/reload | jq .
+
+   # Reload scripts only
+   curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+     http://supervisor/core/api/services/script/reload | jq .
+
+   # Reload scenes
+   curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+     http://supervisor/core/api/services/scene/reload | jq .
+
+   # Reload all YAML config (automations, scripts, scenes, groups, etc.)
+   curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+     http://supervisor/core/api/services/homeassistant/reload_all | jq .
+   ```
+
+2. **For configuration.yaml changes (integrations, core settings):** Tell the
+   user: "These changes require a Home Assistant restart. Please restart from
+   Settings → System → Restart, or I can do it but it will drop this terminal
+   session — you'll need to reconnect."
+
+3. **NEVER restart HA Core without warning the user first.** If they confirm,
+   use:
+   ```bash
+   curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+     http://supervisor/core/restart | jq .
+   ```
+   But ALWAYS warn: "This will restart HA Core and drop this terminal session.
+   You will need to reopen the Copilot CLI panel after restart."
+
+4. **To validate config without restarting:**
+   ```bash
+   curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+     http://supervisor/core/api/config/core/check_config | jq .
+   ```
 
 ## Security
 
