@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.7
+
+- **HARD BLOCK on HA Core restart** — curl wrapper intercepts and blocks any call to `supervisor/core/restart` or `supervisor/core/stop`
+- Strengthened instructions from "warn first" to absolute "NEVER restart" rule
+- Instructions now tell Copilot to direct users to restart from HA UI instead
+- Added `ha-restart` helper script that explains why restart is blocked
+
 ## 1.0.6
 
 - Add critical HA restart safety instructions to copilot-instructions.md

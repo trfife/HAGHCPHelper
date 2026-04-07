@@ -182,51 +182,56 @@ tail -100 /homeassistant/home-assistant.log
 
 ## Applying Configuration Changes
 
-**CRITICAL: You are running inside a Home Assistant add-on container. If you
-restart Home Assistant Core, YOUR CONTAINER WILL ALSO RESTART and this terminal
-session will be killed. The user will see "Connection lost. Reconnecting..."**
+**!!! ABSOLUTE RULE: DO NOT RESTART HOME ASSISTANT CORE !!!**
 
-### What to do instead:
+You are running inside a Home Assistant add-on container. Restarting HA Core
+WILL KILL THIS CONTAINER and terminate your session immediately. The user will
+lose their conversation with you.
 
-1. **For automations, scripts, scenes, groups, input_*:** Use the reload API
-   which does NOT restart HA Core:
-   ```bash
-   # Reload automations only (no restart needed)
-   curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
-     http://supervisor/core/api/services/automation/reload | jq .
+**DO NOT run `curl ... http://supervisor/core/restart` under ANY circumstances.**
+**DO NOT run any command that restarts HA Core, even if the user asks you to.**
 
-   # Reload scripts only
-   curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
-     http://supervisor/core/api/services/script/reload | jq .
+### Instead, ALWAYS use reload APIs:
 
-   # Reload scenes
-   curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
-     http://supervisor/core/api/services/scene/reload | jq .
+Almost all YAML config changes can be applied with reload APIs that do NOT
+require a restart:
 
-   # Reload all YAML config (automations, scripts, scenes, groups, etc.)
-   curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
-     http://supervisor/core/api/services/homeassistant/reload_all | jq .
-   ```
+```bash
+# Reload automations (no restart)
+curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+  http://supervisor/core/api/services/automation/reload | jq .
 
-2. **For configuration.yaml changes (integrations, core settings):** Tell the
-   user: "These changes require a Home Assistant restart. Please restart from
-   Settings → System → Restart, or I can do it but it will drop this terminal
-   session — you'll need to reconnect."
+# Reload scripts (no restart)
+curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+  http://supervisor/core/api/services/script/reload | jq .
 
-3. **NEVER restart HA Core without warning the user first.** If they confirm,
-   use:
-   ```bash
-   curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
-     http://supervisor/core/restart | jq .
-   ```
-   But ALWAYS warn: "This will restart HA Core and drop this terminal session.
-   You will need to reopen the Copilot CLI panel after restart."
+# Reload scenes (no restart)
+curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+  http://supervisor/core/api/services/scene/reload | jq .
 
-4. **To validate config without restarting:**
-   ```bash
-   curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
-     http://supervisor/core/api/config/core/check_config | jq .
-   ```
+# Reload ALL YAML config at once (automations+scripts+scenes+groups+etc.)
+curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+  http://supervisor/core/api/services/homeassistant/reload_all | jq .
+```
+
+### If a full restart is truly required:
+
+For changes to `configuration.yaml` core settings (new integrations, recorder,
+logger, etc.) that CANNOT be reloaded, tell the user:
+
+**"These changes require a Home Assistant restart to take effect. Please restart
+manually from Settings → System → Restart in the HA UI. I cannot restart HA
+from here because it would kill this terminal session."**
+
+DO NOT offer to restart for them. DO NOT restart even if they say "go ahead".
+Tell them to do it from the HA UI.
+
+### Validate config without restarting:
+
+```bash
+curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+  http://supervisor/core/api/config/core/check_config | jq .
+```
 
 ## Security
 
@@ -264,6 +269,24 @@ echo "set-option -g default-shell /bin/bash" >> /root/.tmux.conf
 echo "set-option -g default-command /bin/bash" >> /root/.tmux.conf
 
 # -------------------------------------------------------
+# Create ha-restart wrapper that blocks direct restarts
+# -------------------------------------------------------
+cat > /usr/local/bin/ha-restart << 'WRAPEOF'
+#!/bin/bash
+echo ""
+echo "  ⚠️  HA RESTART BLOCKED"
+echo ""
+echo "  Restarting Home Assistant Core from this terminal will kill"
+echo "  this add-on container and your Copilot session."
+echo ""
+echo "  Please restart manually from the HA UI:"
+echo "  Settings → System → Restart"
+echo ""
+exit 1
+WRAPEOF
+chmod +x /usr/local/bin/ha-restart
+
+# -------------------------------------------------------
 # Build Copilot CLI launch arguments
 # -------------------------------------------------------
 COPILOT_ARGS=""
@@ -293,6 +316,32 @@ echo ""
 exec copilot ${COPILOT_ARGS}
 STARTEOF
 chmod +x /data/copilot-start.sh
+
+# -------------------------------------------------------
+# Create curl wrapper that blocks HA Core restart/stop
+# -------------------------------------------------------
+cat > /usr/local/bin/curl << 'CURLWRAP'
+#!/bin/bash
+# Intercept curl calls to supervisor/core/restart and supervisor/core/stop
+for arg in "$@"; do
+    case "$arg" in
+        *supervisor/core/restart*|*supervisor/core/stop*)
+            echo ""
+            echo "  ⚠️  HA RESTART/STOP BLOCKED"
+            echo ""
+            echo "  Restarting HA Core from this container will kill this session."
+            echo "  Please restart manually from the HA UI:"
+            echo "  Settings → System → Restart"
+            echo ""
+            exit 1
+            ;;
+    esac
+done
+# Pass through to real curl for all other calls
+exec /usr/bin/curl "$@"
+CURLWRAP
+chmod +x /usr/local/bin/curl
+bashio::log.info "Installed curl wrapper to block HA Core restart from terminal"
 
 # -------------------------------------------------------
 # Create bashrc that sources env
