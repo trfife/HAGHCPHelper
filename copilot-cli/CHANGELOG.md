@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.2
+
+- Fix executable permission on s6 service script (Permission denied on startup)
+
+## 1.0.1
+
+- Fix repository URLs to match GitHub remote
+
 ## 1.0.0
 
 - Initial release
