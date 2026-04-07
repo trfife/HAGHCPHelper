@@ -1,0 +1,13 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Copilot CLI data
+.copilot/
+
+# Build artifacts
+*.tar.gz

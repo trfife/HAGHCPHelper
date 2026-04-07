@@ -1,0 +1,192 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+
+bashio::log.info "=== GitHub Copilot CLI Terminal starting ==="
+
+# -------------------------------------------------------
+# Persistent storage setup
+# -------------------------------------------------------
+PERSIST_DIR=/data/copilot-persist
+mkdir -p "${PERSIST_DIR}" /data/projects
+
+# -------------------------------------------------------
+# Read add-on options via bashio
+# -------------------------------------------------------
+GH_TOKEN_OPT=$(bashio::config 'github_token' '')
+MODEL=$(bashio::config 'model' 'default')
+SESSION_NAME=$(bashio::config 'session_name' 'copilot')
+TMUX_HISTORY=$(bashio::config 'tmux_history_limit' '50000')
+AUTO_APPROVE=$(bashio::config 'auto_approve' 'false')
+ENABLE_MCP=$(bashio::config 'enable_ha_mcp' 'true')
+FONT_SIZE=$(bashio::config 'terminal_font_size' '14')
+SESSION_PERSIST=$(bashio::config 'session_persistence' 'true')
+AUTO_UPDATE=$(bashio::config 'auto_update' 'true')
+
+# -------------------------------------------------------
+# GitHub token (PAT auth path)
+# -------------------------------------------------------
+if bashio::var.has_value "${GH_TOKEN_OPT}"; then
+    export GH_TOKEN="${GH_TOKEN_OPT}"
+    bashio::log.info "GitHub token configured via add-on options"
+else
+    bashio::log.info "No GitHub token set — use /login in Copilot CLI to authenticate"
+fi
+
+# -------------------------------------------------------
+# Symlink Copilot config to persistent storage
+# -------------------------------------------------------
+if [ ! -L /root/.copilot ]; then
+    rm -rf /root/.copilot
+    ln -s "${PERSIST_DIR}" /root/.copilot
+fi
+
+# -------------------------------------------------------
+# Auto-update Copilot CLI binary
+# -------------------------------------------------------
+if bashio::var.true "${AUTO_UPDATE}"; then
+    bashio::log.info "Checking for Copilot CLI updates..."
+    if curl -fsSL https://gh.io/copilot-install | PREFIX=/usr/local bash 2>&1; then
+        bashio::log.info "Copilot CLI updated successfully"
+    else
+        bashio::log.warning "Copilot CLI update failed (non-fatal, using existing version)"
+    fi
+fi
+
+# Log installed version
+COPILOT_VERSION=$(copilot --version 2>/dev/null || echo "unknown")
+bashio::log.info "Copilot CLI version: ${COPILOT_VERSION}"
+
+# -------------------------------------------------------
+# Update tmux scrollback from options
+# -------------------------------------------------------
+sed -i "s/history-limit.*/history-limit ${TMUX_HISTORY}/" /root/.tmux.conf
+
+# -------------------------------------------------------
+# Configure Home Assistant MCP server
+# -------------------------------------------------------
+if bashio::var.true "${ENABLE_MCP}" && bashio::var.has_value "${SUPERVISOR_TOKEN:-}"; then
+    bashio::log.info "Configuring Home Assistant MCP server..."
+
+    MCP_CONFIG_DIR="${PERSIST_DIR}"
+    mkdir -p "${MCP_CONFIG_DIR}"
+
+    cat > "${MCP_CONFIG_DIR}/mcp.json" << MCPEOF
+{
+  "mcpServers": {
+    "homeassistant": {
+      "type": "http",
+      "url": "http://supervisor/core/api/mcp",
+      "headers": {
+        "Authorization": "Bearer ${SUPERVISOR_TOKEN}"
+      }
+    }
+  }
+}
+MCPEOF
+    bashio::log.info "HA MCP server configured at http://supervisor/core/api/mcp"
+else
+    if bashio::var.true "${ENABLE_MCP}"; then
+        bashio::log.warning "MCP enabled but no Supervisor token available"
+    else
+        bashio::log.info "HA MCP integration disabled"
+    fi
+fi
+
+# -------------------------------------------------------
+# Write environment file for tmux sessions
+# -------------------------------------------------------
+ENV_FILE=/data/copilot-env.sh
+cat > "${ENV_FILE}" << ENVEOF
+export TERM=xterm-256color
+export LANG=C.UTF-8
+export SHELL=/bin/bash
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:\${PATH}"
+ENVEOF
+
+if bashio::var.has_value "${GH_TOKEN_OPT}"; then
+    echo "export GH_TOKEN=\"${GH_TOKEN_OPT}\"" >> "${ENV_FILE}"
+fi
+
+if [ -n "${SUPERVISOR_TOKEN:-}" ]; then
+    echo "export SUPERVISOR_TOKEN=\"${SUPERVISOR_TOKEN}\"" >> "${ENV_FILE}"
+fi
+
+# -------------------------------------------------------
+# Set default shell for tmux
+# -------------------------------------------------------
+export SHELL=/bin/bash
+echo "set-option -g default-shell /bin/bash" >> /root/.tmux.conf
+echo "set-option -g default-command /bin/bash" >> /root/.tmux.conf
+
+# -------------------------------------------------------
+# Build Copilot CLI launch arguments
+# -------------------------------------------------------
+COPILOT_ARGS=""
+if [ "${MODEL}" != "default" ] && [ -n "${MODEL}" ]; then
+    COPILOT_ARGS="--model ${MODEL}"
+fi
+if bashio::var.true "${AUTO_APPROVE}"; then
+    COPILOT_ARGS="${COPILOT_ARGS} --allow-all-tools"
+    bashio::log.warning "Auto-approve mode enabled — Copilot can execute any tool without asking"
+fi
+
+# -------------------------------------------------------
+# Create startup script
+# -------------------------------------------------------
+cat > /data/copilot-start.sh << STARTEOF
+#!/bin/bash
+source /data/copilot-env.sh
+cd /homeassistant 2>/dev/null || cd /root
+echo ""
+echo "  GitHub Copilot CLI for Home Assistant"
+echo "  Session: ${SESSION_NAME} | Model: ${MODEL}"
+echo "  Close this tab anytime — your session persists!"
+echo ""
+echo "  Type 'copilot' to start, or '/login' inside to authenticate."
+echo "  Aliases: c = copilot | ha-config = cd to HA config"
+echo ""
+exec copilot ${COPILOT_ARGS}
+STARTEOF
+chmod +x /data/copilot-start.sh
+
+# -------------------------------------------------------
+# Create bashrc that sources env
+# -------------------------------------------------------
+cat > /root/.bashrc << 'RCEOF'
+[ -f /data/copilot-env.sh ] && source /data/copilot-env.sh
+alias c="copilot"
+alias cc="copilot --continue"
+alias ha-config="cd /homeassistant"
+alias ha-logs="cat /homeassistant/home-assistant.log 2>/dev/null || echo 'Log not found'"
+RCEOF
+
+# -------------------------------------------------------
+# Get dynamic ingress port from Supervisor
+# -------------------------------------------------------
+ingress_port=$(bashio::addon.ingress_port)
+bashio::log.info "Starting ttyd on ingress port ${ingress_port}"
+
+# -------------------------------------------------------
+# Launch ttyd with session persistence support
+# -------------------------------------------------------
+cd /homeassistant || cd /root
+
+if bashio::var.true "${SESSION_PERSIST}"; then
+    exec ttyd \
+        -i 0.0.0.0 \
+        -p "${ingress_port}" \
+        -W \
+        -t fontSize="${FONT_SIZE}" \
+        -t fontFamily="Monaco,Consolas,monospace" \
+        -t "theme={'background':'#0d1117','foreground':'#e6edf3','cursor':'#58a6ff'}" \
+        /bin/bash -c "exec tmux new-session -A -s ${SESSION_NAME} /data/copilot-start.sh"
+else
+    exec ttyd \
+        -i 0.0.0.0 \
+        -p "${ingress_port}" \
+        -W \
+        -t fontSize="${FONT_SIZE}" \
+        -t fontFamily="Monaco,Consolas,monospace" \
+        -t "theme={'background':'#0d1117','foreground':'#e6edf3','cursor':'#58a6ff'}" \
+        /data/copilot-start.sh
+fi

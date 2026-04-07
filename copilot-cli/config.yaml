@@ -1,0 +1,51 @@
+---
+name: "GitHub Copilot CLI"
+version: "1.0.0"
+slug: copilot_cli
+description: >-
+  Run GitHub Copilot's AI coding agent directly in your Home Assistant
+  sidebar. Edit configs, create automations, debug issues, and control
+  your smart home with an agentic AI assistant.
+url: "https://github.com/thfife/HAGHCPHelper"
+startup: services
+boot: auto
+init: false
+arch:
+  - aarch64
+  - amd64
+ingress: true
+ingress_port: 0
+ingress_stream: true
+panel_icon: mdi:github
+panel_title: "Copilot CLI"
+homeassistant_api: true
+hassio_api: true
+hassio_role: manager
+map:
+  - homeassistant_config:rw
+  - addon_config:rw
+  - share:rw
+  - ssl:ro
+  - media:ro
+options:
+  github_token: ""
+  model: "default"
+  session_name: "copilot"
+  tmux_history_limit: 50000
+  auto_approve: false
+  enable_ha_mcp: true
+  terminal_font_size: 14
+  session_persistence: true
+  auto_update: true
+schema:
+  github_token: "password?"
+  model: "list(default|claude-sonnet-4.5|claude-sonnet-4|gpt-5)"
+  session_name: "str"
+  tmux_history_limit: "int"
+  auto_approve: "bool"
+  enable_ha_mcp: "bool"
+  terminal_font_size: "int(10,24)"
+  session_persistence: "bool"
+  auto_update: "bool"
+environment:
+  TERM: xterm-256color

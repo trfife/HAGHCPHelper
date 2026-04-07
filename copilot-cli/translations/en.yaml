@@ -1,0 +1,46 @@
+---
+configuration:
+  github_token:
+    name: GitHub Token (PAT)
+    description: >-
+      Optional. A fine-grained Personal Access Token with the "Copilot Requests"
+      permission. Leave empty to authenticate interactively via /login inside the
+      terminal.
+  model:
+    name: AI Model
+    description: >-
+      The AI model to use. Default lets Copilot choose (currently Claude Sonnet 4.5).
+      You can also change models at any time with the /model command.
+  session_name:
+    name: Session Name
+    description: >-
+      Name for the tmux session. Used for reconnecting to persistent sessions.
+  tmux_history_limit:
+    name: Scrollback History
+    description: >-
+      Number of lines of scrollback history to keep in the terminal session.
+  auto_approve:
+    name: Auto-Approve Tools
+    description: >-
+      When enabled, Copilot can execute shell commands and modify files without
+      asking for approval. Use with caution — Copilot will have full access to
+      your Home Assistant configuration.
+  enable_ha_mcp:
+    name: Home Assistant MCP
+    description: >-
+      Enable the Home Assistant MCP (Model Context Protocol) server so Copilot
+      can query entities, call services, and interact with your smart home.
+  terminal_font_size:
+    name: Font Size
+    description: >-
+      Terminal font size in pixels (10–24).
+  session_persistence:
+    name: Session Persistence
+    description: >-
+      Use tmux to keep your session alive when navigating away. Disable for
+      simpler terminal behavior with native browser copy/paste.
+  auto_update:
+    name: Auto-Update
+    description: >-
+      Automatically check for and install Copilot CLI updates when the add-on
+      starts.
