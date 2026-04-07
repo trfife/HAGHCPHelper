@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3
+
+- Fix: Explicit chmod +x in Dockerfile for s6 run script (Windows Docker builds strip execute bit)
+
 ## 1.0.2
 
 - Fix executable permission on s6 service script (Permission denied on startup)

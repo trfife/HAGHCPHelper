@@ -86,6 +86,9 @@ RUN echo 'source ~/.bashrc' > /root/.profile
 # Copy rootfs overlay (s6 service scripts)
 COPY rootfs /
 
+# Ensure s6 service scripts are executable (Windows builds may strip the bit)
+RUN chmod +x /etc/services.d/ttyd/run
+
 # Set working directory to HA config
 WORKDIR /homeassistant
 
