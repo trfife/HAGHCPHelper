@@ -6,7 +6,7 @@ description: >-
   Run GitHub Copilot's AI coding agent directly in your Home Assistant
   sidebar. Edit configs, create automations, debug issues, and control
   your smart home with an agentic AI assistant.
-url: "https://github.com/thfife/HAGHCPHelper"
+url: "https://github.com/trfife/HAGHCPHelper"
 startup: services
 boot: auto
 init: false

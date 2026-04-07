@@ -7,5 +7,5 @@ args:
 labels:
   org.opencontainers.image.title: "GitHub Copilot CLI for Home Assistant"
   org.opencontainers.image.description: "GitHub Copilot coding agent with web terminal and HA integration"
-  org.opencontainers.image.source: "https://github.com/thfife/HAGHCPHelper"
+  org.opencontainers.image.source: "https://github.com/trfife/HAGHCPHelper"
   org.opencontainers.image.licenses: "MIT"
