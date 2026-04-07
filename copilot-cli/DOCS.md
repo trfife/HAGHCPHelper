@@ -43,6 +43,9 @@ The MCP server is automatically configured using the Supervisor API token.
 | `cc` | Alias for `copilot --continue` |
 | `ha-config` | Navigate to `/homeassistant` config directory |
 | `ha-logs` | View Home Assistant logs |
+| `nodered` | SSH into Node-RED server |
+| `nr-flows` | Fetch Node-RED flows as JSON |
+| `ssh-key` | Show the add-on's SSH public key |
 
 ## Session Persistence (tmux)
 
@@ -92,6 +95,44 @@ Inside the Copilot CLI interactive session:
 | `/context` | Show token usage breakdown |
 | `/feedback` | Submit feedback to GitHub |
 | `/experimental` | Enable experimental features |
+
+## Node-RED Integration
+
+Copilot can connect to a remote Node-RED server via SSH to view and edit flows.
+
+### Setup
+
+1. Configure the Node-RED connection in the add-on settings:
+   - **Host:** IP address or hostname of your Node-RED server
+   - **Port:** SSH port (default: 22)
+   - **User:** SSH user (default: root)
+   - **Data Path:** Node-RED data directory (default: /data)
+2. Start (or restart) the add-on
+3. Check the add-on logs — if SSH isn't authorized yet, you'll see the public key to add
+4. Copy the public key and add it to your Node-RED server:
+   ```bash
+   # On the Node-RED server:
+   echo '<paste-public-key-here>' >> ~/.ssh/authorized_keys
+   ```
+5. Restart the add-on — the SSH connection should now verify successfully
+
+### Aliases
+
+| Alias | Action |
+|-------|--------|
+| `nodered` | SSH into the Node-RED server |
+| `nr-flows` | Fetch and display all Node-RED flows (JSON) |
+| `ssh-key` | Display the add-on's SSH public key |
+
+### What Copilot Can Do
+
+Once connected, Copilot can:
+
+- View and modify Node-RED flows via the Admin API
+- Edit `settings.js` and `package.json`
+- Install npm packages on the Node-RED server
+- Restart Node-RED after changes
+- Back up and restore flows
 
 ## Auto-Approve Mode
 

@@ -21,6 +21,10 @@ ENABLE_MCP=$(bashio::config 'enable_ha_mcp' 'true')
 FONT_SIZE=$(bashio::config 'terminal_font_size' '14')
 SESSION_PERSIST=$(bashio::config 'session_persistence' 'true')
 AUTO_UPDATE=$(bashio::config 'auto_update' 'true')
+NODERED_HOST=$(bashio::config 'nodered_host' '')
+NODERED_PORT=$(bashio::config 'nodered_port' '22')
+NODERED_USER=$(bashio::config 'nodered_user' 'root')
+NODERED_PATH=$(bashio::config 'nodered_path' '/data')
 
 # -------------------------------------------------------
 # GitHub token (PAT auth path)
@@ -90,6 +94,63 @@ else
     else
         bashio::log.info "HA MCP integration disabled"
     fi
+fi
+
+# -------------------------------------------------------
+# SSH key setup (persistent across restarts)
+# -------------------------------------------------------
+SSH_DIR=/data/copilot-persist/.ssh
+if [ ! -f "${SSH_DIR}/id_ed25519" ]; then
+    bashio::log.info "Generating SSH key pair for remote connections..."
+    mkdir -p "${SSH_DIR}"
+    ssh-keygen -t ed25519 -f "${SSH_DIR}/id_ed25519" -N "" -C "copilot-cli-addon" >/dev/null 2>&1
+    bashio::log.info "SSH key generated. Public key:"
+    bashio::log.info "$(cat "${SSH_DIR}/id_ed25519.pub")"
+else
+    bashio::log.info "Using existing SSH key"
+fi
+
+# Symlink SSH config to persistent storage
+mkdir -p /root/.ssh
+ln -sf "${SSH_DIR}/id_ed25519" /root/.ssh/id_ed25519
+ln -sf "${SSH_DIR}/id_ed25519.pub" /root/.ssh/id_ed25519.pub
+if [ -f "${SSH_DIR}/known_hosts" ]; then
+    ln -sf "${SSH_DIR}/known_hosts" /root/.ssh/known_hosts
+fi
+chmod 700 /root/.ssh
+chmod 600 "${SSH_DIR}/id_ed25519"
+
+# -------------------------------------------------------
+# Node-RED SSH configuration
+# -------------------------------------------------------
+NODERED_CONFIGURED=false
+if bashio::var.has_value "${NODERED_HOST}"; then
+    bashio::log.info "Configuring Node-RED connection to ${NODERED_USER}@${NODERED_HOST}:${NODERED_PORT}..."
+
+    # Write SSH config for easy access
+    cat > /root/.ssh/config << SSHEOF
+Host nodered
+    HostName ${NODERED_HOST}
+    Port ${NODERED_PORT}
+    User ${NODERED_USER}
+    IdentityFile /root/.ssh/id_ed25519
+    StrictHostKeyChecking accept-new
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+SSHEOF
+    chmod 600 /root/.ssh/config
+
+    # Test SSH connection
+    if ssh -o ConnectTimeout=5 -o BatchMode=yes nodered "echo ok" >/dev/null 2>&1; then
+        bashio::log.info "Node-RED SSH connection verified"
+        NODERED_CONFIGURED=true
+    else
+        bashio::log.warning "Cannot connect to Node-RED via SSH. Add this public key to ${NODERED_USER}@${NODERED_HOST}:"
+        bashio::log.warning "$(cat "${SSH_DIR}/id_ed25519.pub")"
+        bashio::log.warning "Run on Node-RED: echo '$(cat "${SSH_DIR}/id_ed25519.pub")' >> ~/.ssh/authorized_keys"
+    fi
+else
+    bashio::log.info "Node-RED integration disabled (no host configured)"
 fi
 
 # -------------------------------------------------------
@@ -256,6 +317,100 @@ curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
 - When creating automations that control security devices (locks, alarms, garage
   doors), always warn the user about safety implications.
 INSTREOF
+
+# Append Node-RED section if configured
+if [ "${NODERED_CONFIGURED}" = "true" ]; then
+    cat >> /homeassistant/.github/copilot-instructions.md << NREOF
+
+## Node-RED Integration
+
+You have SSH access to a Node-RED server. Use it to view and edit Node-RED
+flows and configuration remotely.
+
+### Connection
+
+- **Host alias:** \`nodered\` (use \`ssh nodered\` to connect)
+- **Server:** ${NODERED_HOST}:${NODERED_PORT}
+- **User:** ${NODERED_USER}
+- **Data path:** ${NODERED_PATH}
+
+### Key Files on Node-RED Server
+
+| File | Purpose |
+|------|---------|
+| \`${NODERED_PATH}/flows.json\` | All flows (DO NOT hand-edit — use admin API) |
+| \`${NODERED_PATH}/flows_cred.json\` | Encrypted credentials (DO NOT display) |
+| \`${NODERED_PATH}/settings.js\` | Node-RED settings |
+| \`${NODERED_PATH}/.config.nodes.json\` | Installed nodes registry |
+| \`${NODERED_PATH}/package.json\` | Node-RED dependencies |
+| \`${NODERED_PATH}/node_modules/\` | Installed npm packages |
+
+### Working with Node-RED Flows
+
+**Preferred: Use the Node-RED Admin API** (runs on port 1880 by default):
+
+\`\`\`bash
+# Get all flows
+ssh nodered "curl -sf http://localhost:1880/flows" | jq .
+
+# Deploy updated flows (full deployment)
+ssh nodered "curl -sf -X POST http://localhost:1880/flows \\
+  -H 'Content-Type: application/json' \\
+  -H 'Node-RED-Deployment-Type: full' \\
+  -d @${NODERED_PATH}/flows.json"
+
+# Get a specific flow/tab by ID
+ssh nodered "curl -sf http://localhost:1880/flow/<flow-id>" | jq .
+
+# Install a new node package
+ssh nodered "cd ${NODERED_PATH} && npm install <package-name>"
+
+# Restart Node-RED
+ssh nodered "systemctl restart nodered" 2>/dev/null || \
+ssh nodered "pm2 restart node-red" 2>/dev/null || \
+ssh nodered "supervisorctl restart node-red" 2>/dev/null
+\`\`\`
+
+**Direct file editing** (for settings.js, package.json, custom function nodes):
+
+\`\`\`bash
+# Read a file from Node-RED server
+ssh nodered "cat ${NODERED_PATH}/settings.js"
+
+# Edit files remotely (use heredoc or sed)
+ssh nodered "sed -i 's/old/new/' ${NODERED_PATH}/settings.js"
+
+# Copy files between HA and Node-RED
+scp nodered:${NODERED_PATH}/flows.json /tmp/flows-backup.json
+scp /tmp/myfile.js nodered:${NODERED_PATH}/myfile.js
+\`\`\`
+
+### Important Node-RED Rules
+
+- **NEVER display** the contents of \`flows_cred.json\` — it contains credentials.
+- **Prefer the Admin API** over direct file editing for flows.json changes.
+- **Always back up flows** before making changes: \`ssh nodered "cp ${NODERED_PATH}/flows.json ${NODERED_PATH}/flows.json.bak"\`
+- After installing npm packages, restart Node-RED for changes to take effect.
+- The Node-RED data path may also contain \`lib/\` for user-defined function libraries.
+NREOF
+    bashio::log.info "Node-RED instructions appended to copilot-instructions.md"
+elif bashio::var.has_value "${NODERED_HOST}"; then
+    cat >> /homeassistant/.github/copilot-instructions.md << NRPENDEOF
+
+## Node-RED Integration (SSH Not Yet Authorized)
+
+A Node-RED server is configured at ${NODERED_HOST}:${NODERED_PORT} but SSH
+access has not been authorized yet. The user needs to add this add-on's public
+key to the Node-RED server's authorized_keys file. You can show them the key:
+
+\`\`\`bash
+cat /root/.ssh/id_ed25519.pub
+\`\`\`
+
+Once authorized, restart this add-on to establish the connection.
+NRPENDEOF
+    bashio::log.info "Node-RED pending-auth instructions appended"
+fi
 bashio::log.info "Copilot instructions written to /homeassistant/.github/copilot-instructions.md"
 
 # -------------------------------------------------------
@@ -324,6 +479,9 @@ alias c="copilot"
 alias cc="copilot --continue"
 alias ha-config="cd /homeassistant"
 alias ha-logs="cat /homeassistant/home-assistant.log 2>/dev/null || echo 'Log not found'"
+alias nodered="ssh nodered"
+alias nr-flows="ssh nodered 'curl -sf http://localhost:1880/flows' | jq ."
+alias ssh-key="cat /root/.ssh/id_ed25519.pub"
 RCEOF
 
 # -------------------------------------------------------

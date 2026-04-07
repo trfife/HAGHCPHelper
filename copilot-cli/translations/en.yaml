@@ -44,3 +44,21 @@ configuration:
     description: >-
       Automatically check for and install Copilot CLI updates when the add-on
       starts.
+  nodered_host:
+    name: Node-RED Host
+    description: >-
+      IP address or hostname of your Node-RED server. Leave empty to disable
+      Node-RED integration. Copilot will connect via SSH to edit flows.
+  nodered_port:
+    name: Node-RED SSH Port
+    description: >-
+      SSH port on the Node-RED server (default: 22).
+  nodered_user:
+    name: Node-RED SSH User
+    description: >-
+      SSH username for the Node-RED server (default: root).
+  nodered_path:
+    name: Node-RED Data Path
+    description: >-
+      Path to Node-RED data directory on the remote server (default: /data).
+      This is where flows.json and settings.js are located.

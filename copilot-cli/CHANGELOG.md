@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.9
+
+- **Node-RED SSH integration** — connect to a remote Node-RED server and let Copilot edit flows
+- Auto-generate SSH key pair on first run (persistent across restarts)
+- SSH config with `nodered` host alias for easy access
+- Copilot instructions include Node-RED Admin API usage, file locations, and best practices
+- New aliases: `nodered` (SSH), `nr-flows` (fetch flows), `ssh-key` (show public key)
+- Graceful handling when SSH not yet authorized (shows public key in logs with setup instructions)
+- New config options: `nodered_host`, `nodered_port`, `nodered_user`, `nodered_path`
+
 ## 1.0.8
 
 - Allow HA Core restarts — container survives independently (managed by Supervisor, not Core)

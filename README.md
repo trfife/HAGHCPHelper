@@ -13,6 +13,7 @@ Run [GitHub Copilot CLI](https://github.com/github/copilot-cli) — GitHub's age
 - **Multiple Models** — Choose between Claude Sonnet 4.5, Claude Sonnet 4, GPT-5, or let Copilot decide
 - **GitHub Integration** — Create PRs, manage issues, commit changes — all from your HA dashboard
 - **Lightweight** — Standalone binary, no Node.js runtime required
+- **Node-RED Integration** — SSH into a remote Node-RED server to edit flows and settings
 - **Multi-Architecture** — Supports amd64 and aarch64 (Raspberry Pi 4/5)
 
 ## Installation
@@ -57,6 +58,10 @@ Or manually:
 | `terminal_font_size` | `14` | Font size (10–24) |
 | `session_persistence` | `true` | Use tmux for persistent sessions |
 | `auto_update` | `true` | Auto-update Copilot CLI on startup |
+| `nodered_host` | *(empty)* | Node-RED server IP/hostname (enables SSH integration) |
+| `nodered_port` | `22` | Node-RED SSH port |
+| `nodered_user` | `root` | Node-RED SSH user |
+| `nodered_path` | `/data` | Node-RED data directory path |
 
 ## How It Works
 
