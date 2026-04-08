@@ -21,7 +21,7 @@ BACKEND_AZURE = "azure_ai"
 
 # Register an OAuth App at https://github.com/settings/applications/new
 # Enable "Device Flow" on the app settings page.  Paste the Client ID here.
-GITHUB_OAUTH_CLIENT_ID = ""
+GITHUB_OAUTH_CLIENT_ID = "Ov23li4rTBw9XPm1olwk"
 
 GITHUB_MODELS_URL = "https://models.github.ai/inference/chat/completions"
 GITHUB_API_VERSION = "2026-03-10"
