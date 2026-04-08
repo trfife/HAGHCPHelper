@@ -156,11 +156,12 @@ async def async_fetch_github_models(
         _LOGGER.exception("Error fetching model catalog")
         return []
 
-    # Filter to chat-capable models (support tool-calling)
+    # Exclude embedding-only models (no chat capability)
+    EMBEDDING_PREFIXES = ("openai/text-embedding",)
     chat_models = [
         m for m in models
         if isinstance(m, dict)
-        and "tool-calling" in m.get("capabilities", [])
+        and not m.get("id", "").startswith(EMBEDDING_PREFIXES)
     ]
     # Sort by publisher then name
     chat_models.sort(key=lambda m: (m.get("publisher", ""), m.get("id", "")))

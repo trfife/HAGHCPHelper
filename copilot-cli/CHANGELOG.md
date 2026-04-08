@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1
+
+- Show all chat models from the catalog (not just tool-calling ones), only exclude embedding models
+
 ## 1.3.0
 
 - **Dynamic model catalog** — models are now fetched live from the GitHub Models API instead of a hardcoded list
