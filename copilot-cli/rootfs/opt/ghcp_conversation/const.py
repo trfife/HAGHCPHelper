@@ -11,12 +11,20 @@ CONF_PROMPT = "prompt"
 CONF_TEMPERATURE = "temperature"
 CONF_MAX_TOKENS = "max_tokens"
 CONF_LLM_HASS_API = "llm_hass_api"
+CONF_AUTH_METHOD = "auth_method"
+
+AUTH_METHOD_OAUTH = "oauth"
+AUTH_METHOD_PAT = "pat"
 
 BACKEND_GITHUB = "github_models"
 BACKEND_AZURE = "azure_ai"
 
 GITHUB_MODELS_URL = "https://models.github.ai/inference/chat/completions"
 GITHUB_API_VERSION = "2026-03-10"
+
+# Register your own GitHub OAuth App at https://github.com/settings/applications/new
+# Enable "Device Flow" in the app settings. No client_secret is needed.
+GITHUB_OAUTH_CLIENT_ID = "Ov23liYourClientIdHere"
 
 DEFAULT_MODEL = "openai/gpt-4.1-mini"
 DEFAULT_TEMPERATURE = 0.7
