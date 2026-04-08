@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1
+
+- Fixed auto-install not updating when OAuth client_id was added without a version bump
+
 ## 1.2.0
 
 - **Browser sign-in for GitHub Models** — OAuth device flow: open browser, enter code, authorize, done. Token never expires.
