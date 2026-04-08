@@ -31,7 +31,7 @@ from homeassistant.helpers.selector import (
     TextSelectorType,
 )
 
-from .api import APIError, build_azure_client, build_github_client
+from .api import APIError, async_fetch_github_models, build_azure_client, build_github_client
 from .const import (
     AUTH_METHOD_BROWSER,
     AUTH_METHOD_PAT,
@@ -51,8 +51,8 @@ from .const import (
     DEFAULT_PROMPT,
     DEFAULT_TEMPERATURE,
     DOMAIN,
+    FALLBACK_MODELS,
     GITHUB_OAUTH_CLIENT_ID,
-    RECOMMENDED_MODELS,
     SUBENTRY_TYPE_CONVERSATION,
 )
 from .github_auth import (
@@ -74,8 +74,6 @@ AUTH_OPTIONS = [
     {"value": AUTH_METHOD_PAT, "label": "Personal Access Token"},
 ]
 
-MODEL_OPTIONS = [{"value": m, "label": m} for m in RECOMMENDED_MODELS]
-
 
 class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for GitHub Copilot Conversation."""
@@ -85,6 +83,27 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
         self._device_data: dict[str, Any] | None = None
+        self._model_options: list[dict[str, str]] | None = None
+
+    async def _async_get_model_options(self, token: str) -> list[dict[str, str]]:
+        """Fetch model catalog and return selector options."""
+        if self._model_options is not None:
+            return self._model_options
+
+        async with aiohttp.ClientSession() as session:
+            models = await async_fetch_github_models(session, token)
+
+        if models:
+            self._model_options = [
+                {"value": m["id"], "label": f"{m['name']} ({m['id']})"}
+                for m in models
+            ]
+        else:
+            # Fallback if catalog is unavailable
+            self._model_options = [
+                {"value": m, "label": m} for m in FALLBACK_MODELS
+            ]
+        return self._model_options
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -188,14 +207,13 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Select a model after browser-based auth."""
         errors: dict[str, str] = {}
+        token = self._data[CONF_GITHUB_TOKEN]
 
         if user_input is not None:
             model = user_input.get(CONF_MODEL, DEFAULT_MODEL)
             try:
                 async with aiohttp.ClientSession() as session:
-                    client = build_github_client(
-                        session, self._data[CONF_GITHUB_TOKEN]
-                    )
+                    client = build_github_client(session, token)
                     await client.async_validate(model)
             except APIError as err:
                 _LOGGER.error("GitHub Models validation failed: %s", err)
@@ -213,13 +231,15 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
                     data=self._data,
                 )
 
+        model_options = await self._async_get_model_options(token)
+
         return self.async_show_form(
             step_id="github_model",
             data_schema=vol.Schema(
                 {
                     vol.Optional(CONF_MODEL, default=DEFAULT_MODEL): SelectSelector(
                         SelectSelectorConfig(
-                            options=MODEL_OPTIONS,
+                            options=model_options,
                             custom_value=True,
                             mode=SelectSelectorMode.DROPDOWN,
                         )
@@ -259,6 +279,12 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
                     data=self._data,
                 )
 
+        # For PAT step, we can only fetch models if we have a token from a previous attempt
+        if errors and user_input:
+            model_options = await self._async_get_model_options(user_input[CONF_GITHUB_TOKEN])
+        else:
+            model_options = [{"value": m, "label": m} for m in FALLBACK_MODELS]
+
         return self.async_show_form(
             step_id="github_pat",
             data_schema=vol.Schema(
@@ -268,7 +294,7 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
                     ),
                     vol.Optional(CONF_MODEL, default=DEFAULT_MODEL): SelectSelector(
                         SelectSelectorConfig(
-                            options=MODEL_OPTIONS,
+                            options=model_options,
                             custom_value=True,
                             mode=SelectSelectorMode.DROPDOWN,
                         )
@@ -356,10 +382,24 @@ class GHCPOptionsFlow(OptionsFlow):
 
         schema_dict: dict[Any, Any] = {}
         if backend == BACKEND_GITHUB:
+            token = entry_data.get(CONF_GITHUB_TOKEN, "")
+            # Fetch live model list
+            model_options: list[dict[str, str]] = []
+            if token:
+                async with aiohttp.ClientSession() as session:
+                    models = await async_fetch_github_models(session, token)
+                if models:
+                    model_options = [
+                        {"value": m["id"], "label": f"{m['name']} ({m['id']})"}
+                        for m in models
+                    ]
+            if not model_options:
+                model_options = [{"value": m, "label": m} for m in FALLBACK_MODELS]
+
             schema_dict[
                 vol.Required(
                     CONF_GITHUB_TOKEN,
-                    default=entry_data.get(CONF_GITHUB_TOKEN, ""),
+                    default=token,
                 )
             ] = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
             schema_dict[
@@ -369,7 +409,7 @@ class GHCPOptionsFlow(OptionsFlow):
                 )
             ] = SelectSelector(
                 SelectSelectorConfig(
-                    options=MODEL_OPTIONS,
+                    options=model_options,
                     custom_value=True,
                     mode=SelectSelectorMode.DROPDOWN,
                 )

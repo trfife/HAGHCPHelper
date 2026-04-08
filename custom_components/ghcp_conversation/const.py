@@ -24,25 +24,19 @@ BACKEND_AZURE = "azure_ai"
 GITHUB_OAUTH_CLIENT_ID = "Ov23li4rTBw9XPm1olwk"
 
 GITHUB_MODELS_URL = "https://models.github.ai/inference/chat/completions"
+GITHUB_CATALOG_URL = "https://models.github.ai/catalog/models"
 GITHUB_API_VERSION = "2026-03-10"
 
 DEFAULT_MODEL = "openai/gpt-4.1-mini"
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_MAX_TOKENS = 4096
 
-RECOMMENDED_MODELS = [
+# Fallback models when catalog API is unavailable
+FALLBACK_MODELS = [
     "openai/gpt-4.1",
     "openai/gpt-4.1-mini",
     "openai/gpt-4.1-nano",
     "openai/gpt-4o",
-    "openai/gpt-5",
-    "openai/gpt-5-mini",
-    "meta/llama-4-scout",
-    "meta/llama-4-maverick",
-    "mistral/mistral-large",
-    "deepseek/deepseek-r1",
-    "xai/grok-3",
-    "xai/grok-3-mini",
 ]
 
 DEFAULT_PROMPT = (

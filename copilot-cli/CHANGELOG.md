@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0
+
+- **Dynamic model catalog** — models are now fetched live from the GitHub Models API instead of a hardcoded list
+- Only chat-capable models (with tool-calling support) are shown
+- Fallback to a small default list if the catalog API is unavailable
+- Options flow also fetches live models when changing model selection
+
 ## 1.2.3
 
 - Fixed syntax error in github_auth.py (leftover code from previous refactor) that prevented the integration from loading

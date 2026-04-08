@@ -8,7 +8,7 @@ from typing import Any
 
 import aiohttp
 
-from .const import GITHUB_API_VERSION, GITHUB_MODELS_URL
+from .const import GITHUB_API_VERSION, GITHUB_CATALOG_URL, GITHUB_MODELS_URL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -127,3 +127,41 @@ def build_azure_client(
     return ChatCompletionClient(
         session, base_url=url, api_key=api_key, is_github=False
     )
+
+
+async def async_fetch_github_models(
+    session: aiohttp.ClientSession, token: str
+) -> list[dict[str, Any]]:
+    """Fetch available models from the GitHub Models catalog.
+
+    Returns a list of model dicts with id, name, publisher, capabilities, etc.
+    Only returns models that support tool-calling (chat models).
+    """
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {token}",
+        "X-GitHub-Api-Version": GITHUB_API_VERSION,
+    }
+    try:
+        async with session.get(
+            GITHUB_CATALOG_URL,
+            headers=headers,
+            timeout=aiohttp.ClientTimeout(total=30),
+        ) as resp:
+            if resp.status != 200:
+                _LOGGER.warning("Failed to fetch model catalog: %s", resp.status)
+                return []
+            models = await resp.json()
+    except (aiohttp.ClientError, Exception):
+        _LOGGER.exception("Error fetching model catalog")
+        return []
+
+    # Filter to chat-capable models (support tool-calling)
+    chat_models = [
+        m for m in models
+        if isinstance(m, dict)
+        and "tool-calling" in m.get("capabilities", [])
+    ]
+    # Sort by publisher then name
+    chat_models.sort(key=lambda m: (m.get("publisher", ""), m.get("id", "")))
+    return chat_models
