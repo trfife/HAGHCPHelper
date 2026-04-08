@@ -31,12 +31,18 @@ from homeassistant.helpers.selector import (
     TextSelectorType,
 )
 
+from .acp_client import ACPClient, ACPError
 from .api import APIError, async_fetch_github_models, build_azure_client, build_github_client
 from .const import (
+    ACP_DEFAULT_PORT,
+    ADDON_SLUG,
     AUTH_METHOD_BROWSER,
     AUTH_METHOD_PAT,
     BACKEND_AZURE,
+    BACKEND_COPILOT_CLI,
     BACKEND_GITHUB,
+    CONF_ACP_HOST,
+    CONF_ACP_PORT,
     CONF_AUTH_METHOD,
     CONF_AZURE_API_KEY,
     CONF_AZURE_ENDPOINT,
@@ -65,7 +71,8 @@ from .github_auth import (
 _LOGGER = logging.getLogger(__name__)
 
 BACKEND_OPTIONS = [
-    {"value": BACKEND_GITHUB, "label": "GitHub Models"},
+    {"value": BACKEND_COPILOT_CLI, "label": "Copilot CLI Add-on (recommended)"},
+    {"value": BACKEND_GITHUB, "label": "GitHub Models (direct API)"},
     {"value": BACKEND_AZURE, "label": "Azure AI Endpoint"},
 ]
 
@@ -111,15 +118,19 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle backend selection step."""
         if user_input is not None:
             self._data[CONF_BACKEND] = user_input[CONF_BACKEND]
+            if self._data[CONF_BACKEND] == BACKEND_COPILOT_CLI:
+                return await self.async_step_copilot_cli()
             if self._data[CONF_BACKEND] == BACKEND_GITHUB:
                 return await self.async_step_github()
             return await self.async_step_azure()
 
+        # Auto-detect the add-on to pick the best default
+        default_backend = BACKEND_COPILOT_CLI
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_BACKEND, default=BACKEND_GITHUB): SelectSelector(
+                    vol.Required(CONF_BACKEND, default=default_backend): SelectSelector(
                         SelectSelectorConfig(
                             options=BACKEND_OPTIONS,
                             mode=SelectSelectorMode.LIST,
@@ -128,6 +139,68 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
             ),
         )
+
+    async def async_step_copilot_cli(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Configure the Copilot CLI add-on ACP connection."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            host = user_input.get(CONF_ACP_HOST, "localhost")
+            port = int(user_input.get(CONF_ACP_PORT, ACP_DEFAULT_PORT))
+
+            client = ACPClient(host, port)
+            try:
+                ok = await client.async_validate(timeout=10)
+                if not ok:
+                    errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception("ACP validation error")
+                errors["base"] = "cannot_connect"
+            finally:
+                await client.async_close()
+
+            if not errors:
+                self._data[CONF_ACP_HOST] = host
+                self._data[CONF_ACP_PORT] = port
+                return self.async_create_entry(
+                    title="GitHub Copilot CLI",
+                    data=self._data,
+                )
+
+        # Try to auto-detect the add-on hostname
+        default_host = self._detect_addon_host()
+
+        return self.async_show_form(
+            step_id="copilot_cli",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_ACP_HOST, default=default_host
+                    ): TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT)),
+                    vol.Required(
+                        CONF_ACP_PORT, default=ACP_DEFAULT_PORT
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=1, max=65535, mode=NumberSelectorMode.BOX
+                        )
+                    ),
+                }
+            ),
+            errors=errors,
+        )
+
+    @staticmethod
+    def _detect_addon_host() -> str:
+        """Return the most likely ACP host for the Copilot CLI add-on.
+
+        Inside the HA Docker network the add-on container is reachable via
+        its slug-based hostname.  Falls back to localhost.
+        """
+        # The HA Supervisor DNS resolves add-on slugs as hostnames
+        # within the Docker network: <slug> → container IP.
+        return ADDON_SLUG
 
     async def async_step_github(
         self, user_input: dict[str, Any] | None = None

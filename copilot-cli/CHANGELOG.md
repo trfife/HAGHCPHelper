@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.0
+
+- **Major: Copilot CLI ACP integration** — conversation agent now routes through the Copilot CLI add-on via the Agent Client Protocol (ACP) for full AI capabilities
+- New `copilot_cli` backend: connects to `copilot --acp --port 3000` running as an s6 service inside the add-on container
+- Full CLI power: shell commands, file editing, MCP server access, reasoning/planning — all handled by the Copilot CLI agent
+- New ACP s6 service (`copilot-acp`) starts automatically when `enable_conversation_agent` is enabled
+- Auto-detects add-on hostname within the HA Docker network
+- Existing GitHub Models (direct API) and Azure AI backends remain available as fallback
+- New `acp_client.py`: async NDJSON/TCP client implementing JSON-RPC 2.0 ACP protocol
+- Auto-approves tool permission requests so the CLI agent can operate autonomously
+
 ## 1.3.2
 
 - **Fix**: Default conversation agent now always gets HA Assist API access for entity control (was previously only enabled for subentry agents)

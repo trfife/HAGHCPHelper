@@ -26,10 +26,15 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import intent, llm
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .acp_client import ACPClient, ACPError
 from .api import APIError, ChatCompletionClient, build_azure_client, build_github_client
 from .const import (
+    ACP_DEFAULT_PORT,
     BACKEND_AZURE,
+    BACKEND_COPILOT_CLI,
     BACKEND_GITHUB,
+    CONF_ACP_HOST,
+    CONF_ACP_PORT,
     CONF_AZURE_API_KEY,
     CONF_AZURE_ENDPOINT,
     CONF_BACKEND,
@@ -125,6 +130,56 @@ class GHCPConversationEntity(ConversationEntity):
     ) -> ConversationResult:
         """Process an incoming chat message."""
         data = self._entry_data
+        backend = data.get(CONF_BACKEND, BACKEND_GITHUB)
+
+        # ACP mode — forward prompt to Copilot CLI
+        if backend == BACKEND_COPILOT_CLI:
+            return await self._async_handle_acp(user_input, chat_log, data)
+
+        return await self._async_handle_direct_api(user_input, chat_log, data)
+
+    async def _async_handle_acp(
+        self,
+        user_input: ConversationInput,
+        chat_log: ChatLog,
+        data: dict[str, Any],
+    ) -> ConversationResult:
+        """Route the prompt through the Copilot CLI ACP server."""
+        host = data.get(CONF_ACP_HOST, "localhost")
+        port = int(data.get(CONF_ACP_PORT, ACP_DEFAULT_PORT))
+
+        client = ACPClient(host, port)
+        try:
+            await client.async_connect()
+            await client.async_initialize()
+            await client.async_new_session(cwd="/homeassistant")
+            content = await client.async_prompt(user_input.text)
+        except ACPError as err:
+            _LOGGER.error("ACP error: %s", err)
+            content = f"Sorry, I couldn't reach the Copilot CLI: {err}"
+        except Exception:
+            _LOGGER.exception("Unexpected ACP error")
+            content = "Sorry, an unexpected error occurred with the Copilot CLI."
+        finally:
+            await client.async_close()
+
+        chat_log.async_add_assistant_content_without_tools(
+            AssistantContent(agent_id=user_input.agent_id, content=content)
+        )
+        response_obj = intent.IntentResponse(language=user_input.language)
+        response_obj.async_set_speech(content)
+        return ConversationResult(
+            response=response_obj,
+            conversation_id=chat_log.conversation_id,
+        )
+
+    async def _async_handle_direct_api(
+        self,
+        user_input: ConversationInput,
+        chat_log: ChatLog,
+        data: dict[str, Any],
+    ) -> ConversationResult:
+        """Route the prompt through the direct GitHub Models / Azure API."""
         model = data.get(CONF_MODEL, DEFAULT_MODEL)
         temperature = data.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE)
         max_tokens = int(data.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS))

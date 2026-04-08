@@ -1,0 +1,6 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+# s6 finish script for copilot-acp service — log why it stopped.
+
+EXIT_CODE="${1:-unknown}"
+bashio::log.warning "Copilot ACP server exited with code ${EXIT_CODE} — s6 will restart"

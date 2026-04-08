@@ -15,6 +15,18 @@
           "auth_method": "Authentication Method"
         }
       },
+      "copilot_cli": {
+        "title": "Copilot CLI Connection",
+        "description": "Connect to the GitHub Copilot CLI add-on's ACP server. The add-on must be installed and running with `enable_conversation_agent` enabled.",
+        "data": {
+          "acp_host": "ACP Host",
+          "acp_port": "ACP Port"
+        },
+        "data_description": {
+          "acp_host": "Hostname of the Copilot CLI add-on (auto-detected when running in HA)",
+          "acp_port": "TCP port the ACP server listens on (default: 3000)"
+        }
+      },
       "github_device": {
         "title": "Sign in with GitHub",
         "description": "1. Open **[{url}]({url})** in your browser\n2. Enter the code: **{code}**\n3. Authorize the application\n4. Click **Submit** below"

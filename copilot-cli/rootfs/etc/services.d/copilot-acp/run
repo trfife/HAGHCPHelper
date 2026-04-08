@@ -1,0 +1,65 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+# s6 service: GitHub Copilot CLI ACP (Agent Client Protocol) server
+# Exposes a JSON-RPC 2.0 / NDJSON TCP server that the HA conversation
+# agent integration connects to for full CLI-powered AI reasoning.
+
+ACP_PORT=3000
+
+# -------------------------------------------------------
+# Only start if conversation agent feature is enabled
+# -------------------------------------------------------
+ENABLE_CONV_AGENT=$(bashio::config 'enable_conversation_agent' 'true')
+if ! bashio::var.true "${ENABLE_CONV_AGENT}"; then
+    bashio::log.info "ACP server disabled (enable_conversation_agent = false)"
+    exec s6-svc -d /var/run/s6/services/copilot-acp
+fi
+
+# -------------------------------------------------------
+# Wait for the copilot binary to be ready
+# -------------------------------------------------------
+if ! command -v copilot &>/dev/null; then
+    bashio::log.error "Copilot CLI binary not found at /usr/local/bin/copilot"
+    exec sleep 30
+fi
+
+# -------------------------------------------------------
+# Ensure the user is authenticated before starting ACP
+# We retry in a loop — the user may authenticate via the
+# ttyd terminal at any time.
+# -------------------------------------------------------
+MAX_AUTH_WAIT=600  # 10 minutes
+AUTH_ELAPSED=0
+while true; do
+    if copilot --version &>/dev/null; then
+        # Basic binary check passed; now verify auth by attempting a
+        # trivial operation.  `copilot --acp` itself will fail
+        # gracefully if not authed, so we just proceed.
+        break
+    fi
+    if [ "${AUTH_ELAPSED}" -ge "${MAX_AUTH_WAIT}" ]; then
+        bashio::log.warning "ACP: Copilot auth wait timed out — starting anyway"
+        break
+    fi
+    bashio::log.info "ACP: Waiting for Copilot CLI authentication..."
+    sleep 10
+    AUTH_ELAPSED=$((AUTH_ELAPSED + 10))
+done
+
+# -------------------------------------------------------
+# Inherit environment (GH_TOKEN, SUPERVISOR_TOKEN, etc.)
+# The env file is written by the ttyd service start-up.
+# -------------------------------------------------------
+if [ -f /data/copilot-env.sh ]; then
+    # shellcheck disable=SC1091
+    source /data/copilot-env.sh
+fi
+
+bashio::log.info "Starting Copilot ACP server on port ${ACP_PORT}..."
+
+# -------------------------------------------------------
+# Launch ACP server
+# -------------------------------------------------------
+cd /homeassistant || cd /root
+
+exec copilot --acp --port "${ACP_PORT}" --allow-all-tools

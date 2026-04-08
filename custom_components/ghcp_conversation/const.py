@@ -18,6 +18,13 @@ AUTH_METHOD_PAT = "pat"
 
 BACKEND_GITHUB = "github_models"
 BACKEND_AZURE = "azure_ai"
+BACKEND_COPILOT_CLI = "copilot_cli"
+
+# ACP (Agent Client Protocol) settings for Copilot CLI add-on
+CONF_ACP_HOST = "acp_host"
+CONF_ACP_PORT = "acp_port"
+ACP_DEFAULT_PORT = 3000
+ADDON_SLUG = "copilot_cli"
 
 # Register an OAuth App at https://github.com/settings/applications/new
 # Enable "Device Flow" on the app settings page.  Paste the Client ID here.
