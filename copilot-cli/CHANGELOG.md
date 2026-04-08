@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0
+
+- **Browser sign-in for GitHub Models** — OAuth device flow: open browser, enter code, authorize, done. Token never expires.
+- Two auth options: "Sign in with GitHub" (OAuth) or Personal Access Token (PAT) fallback
+- Requires a GitHub OAuth App client_id (one-time setup by the add-on maintainer)
+- If no OAuth App is configured, gracefully falls back to PAT-only
+
 ## 1.1.1
 
 - Simplified GitHub authentication — single-page PAT entry, removed OAuth device flow complexity

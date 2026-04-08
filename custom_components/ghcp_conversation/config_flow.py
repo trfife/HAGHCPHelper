@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -33,8 +34,11 @@ from homeassistant.helpers.selector import (
 
 from .api import APIError, build_azure_client, build_github_client
 from .const import (
+    AUTH_METHOD_BROWSER,
+    AUTH_METHOD_PAT,
     BACKEND_AZURE,
     BACKEND_GITHUB,
+    CONF_AUTH_METHOD,
     CONF_AZURE_API_KEY,
     CONF_AZURE_ENDPOINT,
     CONF_BACKEND,
@@ -48,15 +52,22 @@ from .const import (
     DEFAULT_PROMPT,
     DEFAULT_TEMPERATURE,
     DOMAIN,
+    GITHUB_OAUTH_CLIENT_ID,
     RECOMMENDED_MODELS,
     SUBENTRY_TYPE_CONVERSATION,
 )
+from .github_auth import DeviceFlowError, async_poll_for_token, async_request_device_code
 
 _LOGGER = logging.getLogger(__name__)
 
 BACKEND_OPTIONS = [
     {"value": BACKEND_GITHUB, "label": "GitHub Models"},
     {"value": BACKEND_AZURE, "label": "Azure AI Endpoint"},
+]
+
+AUTH_OPTIONS = [
+    {"value": AUTH_METHOD_BROWSER, "label": "Sign in with GitHub (browser)"},
+    {"value": AUTH_METHOD_PAT, "label": "Personal Access Token"},
 ]
 
 MODEL_OPTIONS = [{"value": m, "label": m} for m in RECOMMENDED_MODELS]
@@ -69,6 +80,8 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
+        self._device_data: dict[str, Any] | None = None
+        self._auth_task: asyncio.Task[str] | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -97,7 +110,128 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_github(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Configure GitHub Models — token and model on one page."""
+        """Choose GitHub auth method — browser (OAuth) or PAT."""
+        # If no OAuth App client_id is configured, skip straight to PAT
+        if not GITHUB_OAUTH_CLIENT_ID:
+            return await self.async_step_github_pat()
+
+        if user_input is not None:
+            if user_input[CONF_AUTH_METHOD] == AUTH_METHOD_BROWSER:
+                return await self.async_step_github_device()
+            return await self.async_step_github_pat()
+
+        return self.async_show_form(
+            step_id="github",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_AUTH_METHOD, default=AUTH_METHOD_BROWSER
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=AUTH_OPTIONS,
+                            mode=SelectSelectorMode.LIST,
+                        )
+                    ),
+                }
+            ),
+        )
+
+    async def async_step_github_device(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """OAuth device flow — show code, poll for authorization."""
+        if not self._auth_task:
+            # Request fresh device code
+            async with aiohttp.ClientSession() as session:
+                self._device_data = await async_request_device_code(
+                    session, GITHUB_OAUTH_CLIENT_ID
+                )
+            # Start background polling task
+            self._auth_task = self.hass.async_create_task(
+                self._async_poll_github_token()
+            )
+
+        if not self._auth_task.done():
+            return self.async_show_progress(
+                step_id="github_device",
+                progress_action="wait_for_auth",
+                progress_task=self._auth_task,
+                description_placeholders={
+                    "url": self._device_data["verification_uri"],
+                    "code": self._device_data["user_code"],
+                },
+            )
+
+        # Polling task finished
+        try:
+            self._data[CONF_GITHUB_TOKEN] = self._auth_task.result()
+        except (DeviceFlowError, Exception):
+            _LOGGER.exception("GitHub device flow failed")
+            return self.async_abort(reason="device_flow_failed")
+
+        return self.async_show_progress_done(next_step_id="github_model")
+
+    async def _async_poll_github_token(self) -> str:
+        """Background task: poll GitHub for the access token."""
+        assert self._device_data is not None
+        async with aiohttp.ClientSession() as session:
+            return await async_poll_for_token(
+                session,
+                GITHUB_OAUTH_CLIENT_ID,
+                self._device_data["device_code"],
+                self._device_data.get("interval", 5),
+            )
+
+    async def async_step_github_model(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Select a model after browser-based auth."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            model = user_input.get(CONF_MODEL, DEFAULT_MODEL)
+            try:
+                async with aiohttp.ClientSession() as session:
+                    client = build_github_client(
+                        session, self._data[CONF_GITHUB_TOKEN]
+                    )
+                    await client.async_validate(model)
+            except APIError as err:
+                _LOGGER.error("GitHub Models validation failed: %s", err)
+                if err.status in (401, 403):
+                    errors["base"] = "invalid_auth"
+                else:
+                    errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception("Unexpected error during validation")
+                errors["base"] = "unknown"
+            else:
+                self._data[CONF_MODEL] = model
+                return self.async_create_entry(
+                    title="GitHub Copilot Conversation",
+                    data=self._data,
+                )
+
+        return self.async_show_form(
+            step_id="github_model",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(CONF_MODEL, default=DEFAULT_MODEL): SelectSelector(
+                        SelectSelectorConfig(
+                            options=MODEL_OPTIONS,
+                            custom_value=True,
+                            mode=SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+                }
+            ),
+            errors=errors,
+        )
+
+    async def async_step_github_pat(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Configure GitHub Models with a Personal Access Token."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -125,7 +259,7 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
 
         return self.async_show_form(
-            step_id="github",
+            step_id="github_pat",
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_GITHUB_TOKEN): TextSelector(

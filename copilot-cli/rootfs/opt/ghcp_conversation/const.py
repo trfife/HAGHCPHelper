@@ -11,9 +11,17 @@ CONF_PROMPT = "prompt"
 CONF_TEMPERATURE = "temperature"
 CONF_MAX_TOKENS = "max_tokens"
 CONF_LLM_HASS_API = "llm_hass_api"
+CONF_AUTH_METHOD = "auth_method"
+
+AUTH_METHOD_BROWSER = "browser"
+AUTH_METHOD_PAT = "pat"
 
 BACKEND_GITHUB = "github_models"
 BACKEND_AZURE = "azure_ai"
+
+# Register an OAuth App at https://github.com/settings/applications/new
+# Enable "Device Flow" on the app settings page.  Paste the Client ID here.
+GITHUB_OAUTH_CLIENT_ID = ""
 
 GITHUB_MODELS_URL = "https://models.github.ai/inference/chat/completions"
 GITHUB_API_VERSION = "2026-03-10"
