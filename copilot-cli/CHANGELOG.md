@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.3
+
+- Fixed syntax error in github_auth.py (leftover code from previous refactor) that prevented the integration from loading
+
 ## 1.2.2
 
 - Fixed device flow sign-in: now shows the code and URL on a proper form page instead of a blank progress spinner

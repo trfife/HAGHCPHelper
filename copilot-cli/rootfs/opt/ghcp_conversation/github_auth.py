@@ -72,7 +72,3 @@ async def async_exchange_device_code(
         raise DeviceFlowError(f"Device flow failed: {error}")
 
     raise DeviceFlowError(f"Unexpected response: {data}")
-
-        _LOGGER.warning("Unexpected device flow response: %s", data)
-
-    raise DeviceFlowError("Device flow timed out waiting for authorization")
