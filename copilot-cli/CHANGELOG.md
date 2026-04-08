@@ -1,9 +1,14 @@
 # Changelog
 
+## 1.1.1
+
+- Simplified GitHub authentication — single-page PAT entry, removed OAuth device flow complexity
+- Cleaned up config flow: choose backend → enter credentials + model → done
+- Fixed strings and translations to match simplified flow
+
 ## 1.1.0
 
 - **Conversation Agent integration** — auto-installs a custom HA integration (`ghcp_conversation`) that registers as a conversation entity
-- **Sign in with GitHub** — OAuth device flow authentication (open browser, enter code, done) — no PAT needed
 - Use GitHub Copilot models (via GitHub Models API) or Azure AI endpoints as an Assist conversation agent
 - Full entity control: turn on lights, query sensors, trigger automations — all through natural language
 - Supports tool calling (function calling) for reliable HA actions

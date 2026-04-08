@@ -8,39 +8,15 @@
           "backend": "Backend"
         }
       },
-      "github_auth": {
-        "title": "GitHub Authentication",
-        "description": "Choose how to authenticate with GitHub Models.",
-        "data": {
-          "auth_method": "Authentication Method"
-        }
-      },
-      "github_device": {
-        "title": "Sign in with GitHub",
-        "description": "Open **[{url}]({url})** in your browser and enter the code:\n\n## `{code}`\n\nWaiting for authorization...",
-        "progress_action": {
-          "wait_for_auth": "Waiting for you to authorize in your browser..."
-        }
-      },
-      "github_model": {
-        "title": "Select Model",
-        "description": "GitHub authentication successful! Choose which AI model to use.",
-        "data": {
-          "model": "Model"
-        },
-        "data_description": {
-          "model": "Select a model or type a custom model ID (format: publisher/model-name)"
-        }
-      },
-      "github_pat": {
-        "title": "Personal Access Token",
-        "description": "Enter your GitHub Personal Access Token with the `models:read` permission.",
+      "github": {
+        "title": "GitHub Models",
+        "description": "Enter a GitHub Personal Access Token with `models:read` permission.\n\n[Create a fine-grained PAT](https://github.com/settings/personal-access-tokens/new)",
         "data": {
           "github_token": "GitHub Token (PAT)",
           "model": "Model"
         },
         "data_description": {
-          "github_token": "A fine-grained PAT with `models:read` scope. Create one at github.com/settings/personal-access-tokens/new",
+          "github_token": "A fine-grained PAT with `models:read` scope",
           "model": "Select a model or type a custom model ID (format: publisher/model-name)"
         }
       },
@@ -65,8 +41,7 @@
       "unknown": "An unexpected error occurred."
     },
     "abort": {
-      "already_configured": "This integration is already configured.",
-      "device_flow_failed": "GitHub login failed or expired. Please try again."
+      "already_configured": "This integration is already configured."
     }
   },
   "options": {
