@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.2
+
+- **Fix**: Default conversation agent now always gets HA Assist API access for entity control (was previously only enabled for subentry agents)
+- "Close the office blinds", "turn on the lights", etc. now work out of the box
+
 ## 1.3.1
 
 - Show all chat models from the catalog (not just tool-calling ones), only exclude embedding models

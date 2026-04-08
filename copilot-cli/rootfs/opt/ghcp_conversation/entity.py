@@ -131,19 +131,17 @@ class GHCPConversationEntity(ConversationEntity):
         system_prompt = data.get(CONF_PROMPT, DEFAULT_PROMPT)
 
         # Provide HA LLM tools to the chat log
-        llm_api_ids = data.get(CONF_LLM_HASS_API)
-        if llm_api_ids:
-            await chat_log.async_provide_llm_data(
-                user_input.as_llm_context(DOMAIN),
-                llm_api_ids,
-                system_prompt,
-                user_input.extra_system_prompt,
-            )
-            # Use the chat_log's generated prompt if available
-            if chat_log.llm_api:
-                system_prompt = chat_log.llm_api.prompt
-        elif user_input.extra_system_prompt:
-            system_prompt = f"{system_prompt}\n{user_input.extra_system_prompt}"
+        # Default to the Assist API so every agent can control HA out of the box
+        llm_api_ids = data.get(CONF_LLM_HASS_API) or [llm.LLM_API_ASSIST]
+        await chat_log.async_provide_llm_data(
+            user_input.as_llm_context(DOMAIN),
+            llm_api_ids,
+            system_prompt,
+            user_input.extra_system_prompt,
+        )
+        # Use the chat_log's generated prompt if available
+        if chat_log.llm_api:
+            system_prompt = chat_log.llm_api.prompt
 
         # Build messages from chat log
         messages = self._build_messages(system_prompt, chat_log)
