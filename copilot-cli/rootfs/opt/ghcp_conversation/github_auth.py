@@ -17,6 +17,10 @@ class DeviceFlowError(Exception):
     """Raised when the device flow fails."""
 
 
+class AuthorizationPending(DeviceFlowError):
+    """User hasn't authorized yet."""
+
+
 async def async_request_device_code(
     session: aiohttp.ClientSession,
     client_id: str,
@@ -36,47 +40,38 @@ async def async_request_device_code(
         return await resp.json()
 
 
-async def async_poll_for_token(
+async def async_exchange_device_code(
     session: aiohttp.ClientSession,
     client_id: str,
     device_code: str,
-    interval: int = 5,
-    timeout: int = 900,
 ) -> str:
-    """Poll GitHub until the user authorizes or the code expires.
+    """Attempt a single token exchange.
 
-    Returns the access_token string on success.
-    Raises DeviceFlowError on failure/timeout.
+    Returns the access_token on success.
+    Raises AuthorizationPending if user hasn't authorized yet.
+    Raises DeviceFlowError on terminal errors.
     """
-    elapsed = 0
-    poll_interval = interval
+    async with session.post(
+        ACCESS_TOKEN_URL,
+        data={
+            "client_id": client_id,
+            "device_code": device_code,
+            "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+        },
+        headers={"Accept": "application/json"},
+    ) as resp:
+        data = await resp.json()
 
-    while elapsed < timeout:
-        await asyncio.sleep(poll_interval)
-        elapsed += poll_interval
+    if "access_token" in data:
+        return data["access_token"]
 
-        async with session.post(
-            ACCESS_TOKEN_URL,
-            data={
-                "client_id": client_id,
-                "device_code": device_code,
-                "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
-            },
-            headers={"Accept": "application/json"},
-        ) as resp:
-            data = await resp.json()
+    error = data.get("error", "")
+    if error in ("authorization_pending", "slow_down"):
+        raise AuthorizationPending("User has not yet authorized")
+    if error in ("expired_token", "access_denied", "incorrect_device_code"):
+        raise DeviceFlowError(f"Device flow failed: {error}")
 
-        if "access_token" in data:
-            return data["access_token"]
-
-        error = data.get("error", "")
-        if error == "authorization_pending":
-            continue
-        if error == "slow_down":
-            poll_interval += 5
-            continue
-        if error in ("expired_token", "access_denied", "incorrect_device_code"):
-            raise DeviceFlowError(f"Device flow failed: {error}")
+    raise DeviceFlowError(f"Unexpected response: {data}")
 
         _LOGGER.warning("Unexpected device flow response: %s", data)
 

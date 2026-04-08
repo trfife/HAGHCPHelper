@@ -17,10 +17,7 @@
       },
       "github_device": {
         "title": "Sign in with GitHub",
-        "description": "Open **[{url}]({url})** in your browser and enter the code:\n\n## `{code}`\n\nWaiting for authorization...",
-        "progress_action": {
-          "wait_for_auth": "Waiting for you to authorize in your browser..."
-        }
+        "description": "1. Open **[{url}]({url})** in your browser\n2. Enter the code: **{code}**\n3. Authorize the application\n4. Click **Submit** below"
       },
       "github_model": {
         "title": "Select Model",
@@ -62,7 +59,8 @@
     "error": {
       "invalid_auth": "Authentication failed. Check your token or API key.",
       "cannot_connect": "Could not connect to the API. Check the endpoint and try again.",
-      "unknown": "An unexpected error occurred."
+      "unknown": "An unexpected error occurred.",
+      "not_yet_authorized": "Not authorized yet. Complete the steps above in your browser, then click Submit again."
     },
     "abort": {
       "already_configured": "This integration is already configured.",

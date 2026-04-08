@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
@@ -56,7 +55,12 @@ from .const import (
     RECOMMENDED_MODELS,
     SUBENTRY_TYPE_CONVERSATION,
 )
-from .github_auth import DeviceFlowError, async_poll_for_token, async_request_device_code
+from .github_auth import (
+    AuthorizationPending,
+    DeviceFlowError,
+    async_exchange_device_code,
+    async_request_device_code,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -81,7 +85,6 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
         self._device_data: dict[str, Any] | None = None
-        self._auth_task: asyncio.Task[str] | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -139,48 +142,46 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_github_device(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """OAuth device flow — show code, poll for authorization."""
-        if not self._auth_task:
-            # Request fresh device code
-            async with aiohttp.ClientSession() as session:
-                self._device_data = await async_request_device_code(
-                    session, GITHUB_OAUTH_CLIENT_ID
-                )
-            # Start background polling task
-            self._auth_task = self.hass.async_create_task(
-                self._async_poll_github_token()
-            )
+        """OAuth device flow — show code and URL, user clicks Submit after authorizing."""
+        errors: dict[str, str] = {}
 
-        if not self._auth_task.done():
-            return self.async_show_progress(
-                step_id="github_device",
-                progress_action="wait_for_auth",
-                progress_task=self._auth_task,
-                description_placeholders={
-                    "url": self._device_data["verification_uri"],
-                    "code": self._device_data["user_code"],
-                },
-            )
+        if user_input is not None:
+            # User clicked Submit — attempt to exchange the device code
+            try:
+                async with aiohttp.ClientSession() as session:
+                    token = await async_exchange_device_code(
+                        session,
+                        GITHUB_OAUTH_CLIENT_ID,
+                        self._device_data["device_code"],
+                    )
+                self._data[CONF_GITHUB_TOKEN] = token
+                return await self.async_step_github_model()
+            except AuthorizationPending:
+                errors["base"] = "not_yet_authorized"
+            except DeviceFlowError as err:
+                _LOGGER.error("GitHub device flow failed: %s", err)
+                return self.async_abort(reason="device_flow_failed")
 
-        # Polling task finished
-        try:
-            self._data[CONF_GITHUB_TOKEN] = self._auth_task.result()
-        except (DeviceFlowError, Exception):
-            _LOGGER.exception("GitHub device flow failed")
-            return self.async_abort(reason="device_flow_failed")
+        if not self._device_data:
+            # First visit — request a fresh device code
+            try:
+                async with aiohttp.ClientSession() as session:
+                    self._device_data = await async_request_device_code(
+                        session, GITHUB_OAUTH_CLIENT_ID
+                    )
+            except DeviceFlowError as err:
+                _LOGGER.error("Failed to start device flow: %s", err)
+                return self.async_abort(reason="device_flow_failed")
 
-        return self.async_show_progress_done(next_step_id="github_model")
-
-    async def _async_poll_github_token(self) -> str:
-        """Background task: poll GitHub for the access token."""
-        assert self._device_data is not None
-        async with aiohttp.ClientSession() as session:
-            return await async_poll_for_token(
-                session,
-                GITHUB_OAUTH_CLIENT_ID,
-                self._device_data["device_code"],
-                self._device_data.get("interval", 5),
-            )
+        return self.async_show_form(
+            step_id="github_device",
+            data_schema=vol.Schema({}),
+            description_placeholders={
+                "url": self._device_data["verification_uri"],
+                "code": self._device_data["user_code"],
+            },
+            errors=errors,
+        )
 
     async def async_step_github_model(
         self, user_input: dict[str, Any] | None = None

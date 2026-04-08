@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.2
+
+- Fixed device flow sign-in: now shows the code and URL on a proper form page instead of a blank progress spinner
+- User flow: see code + link, open browser, authorize, click Submit
+
 ## 1.2.1
 
 - Fixed auto-install not updating when OAuth client_id was added without a version bump
