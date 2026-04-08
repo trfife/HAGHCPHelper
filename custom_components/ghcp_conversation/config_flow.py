@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 import aiohttp
@@ -169,8 +170,8 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
                     data=self._data,
                 )
 
-        # Try to auto-detect the add-on hostname
-        default_host = self._detect_addon_host()
+        # Try to auto-detect the add-on IP via Supervisor API
+        default_host = await self._async_discover_addon_host()
 
         return self.async_show_form(
             step_id="copilot_cli",
@@ -191,16 +192,76 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    @staticmethod
-    def _detect_addon_host() -> str:
-        """Return the most likely ACP host for the Copilot CLI add-on.
+    async def _async_discover_addon_host(self) -> str:
+        """Discover the Copilot CLI add-on IP via the Supervisor API.
 
-        Inside the HA Docker network the add-on container is reachable via
-        its slug-based hostname.  Falls back to localhost.
+        Queries the Supervisor for installed add-ons, finds the one
+        with a slug ending in '_copilot_cli' or 'copilot_cli', and
+        returns its IP address.  Falls back to 'localhost'.
         """
-        # The HA Supervisor DNS resolves add-on slugs as hostnames
-        # within the Docker network: <slug> → container IP.
-        return ADDON_SLUG
+        supervisor_token = os.environ.get("SUPERVISOR_TOKEN")
+        if not supervisor_token:
+            _LOGGER.debug("No SUPERVISOR_TOKEN — cannot auto-discover add-on")
+            return "localhost"
+
+        headers = {
+            "Authorization": f"Bearer {supervisor_token}",
+            "Content-Type": "application/json",
+        }
+        try:
+            async with aiohttp.ClientSession() as session:
+                # List all installed add-ons
+                async with session.get(
+                    "http://supervisor/addons",
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    if resp.status != 200:
+                        _LOGGER.debug("Supervisor /addons returned %s", resp.status)
+                        return "localhost"
+                    result = await resp.json()
+
+                addons = result.get("data", {}).get("addons", [])
+                addon_slug = None
+                for addon in addons:
+                    slug = addon.get("slug", "")
+                    if slug == ADDON_SLUG or slug.endswith(f"_{ADDON_SLUG}"):
+                        addon_slug = slug
+                        break
+
+                if not addon_slug:
+                    _LOGGER.debug("Copilot CLI add-on not found in installed add-ons")
+                    return "localhost"
+
+                # Get detailed info including IP address
+                async with session.get(
+                    f"http://supervisor/addons/{addon_slug}/info",
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    if resp.status != 200:
+                        _LOGGER.debug("Supervisor addon info returned %s", resp.status)
+                        return "localhost"
+                    info = await resp.json()
+
+                data = info.get("data", {})
+                ip_addr = data.get("ip_address")
+                if ip_addr:
+                    _LOGGER.info(
+                        "Auto-discovered Copilot CLI add-on at %s (slug=%s)",
+                        ip_addr,
+                        addon_slug,
+                    )
+                    return ip_addr
+
+                hostname = data.get("hostname")
+                if hostname:
+                    return hostname
+
+        except Exception:
+            _LOGGER.debug("Failed to auto-discover add-on", exc_info=True)
+
+        return "localhost"
 
     async def async_step_github(
         self, user_input: dict[str, Any] | None = None
