@@ -164,3 +164,100 @@ When `auto_approve` is enabled, Copilot executes commands without asking. This i
 1. Verify `enable_ha_mcp` is true
 2. Check add-on logs for MCP configuration messages
 3. Restart the add-on after configuration changes
+
+## Conversation Agent Integration
+
+The add-on can automatically install a **GitHub Copilot Conversation** integration into Home Assistant. This registers a conversation entity that you can use with HA's **Assist** pipeline to control devices and query states through natural language — via voice or text.
+
+### How It Works
+
+```
+User (voice/text via Assist)
+  → HA Conversation Pipeline
+    → GitHub Copilot Conversation entity
+      → GitHub Models API (or Azure AI endpoint)
+        ← LLM response + tool calls for entity control
+    ← Speech response
+  → TTS (optional voice output)
+```
+
+### Setup
+
+1. Ensure `enable_conversation_agent` is **true** in the add-on configuration (default)
+2. Start or restart the add-on — check the logs for "Conversation agent installed"
+3. **Restart Home Assistant** (required on first install only)
+4. Go to **Settings → Integrations → Add Integration**
+5. Search for **GitHub Copilot Conversation**
+6. Choose your backend:
+   - **GitHub Models** — enter a GitHub PAT with the `models:read` permission
+   - **Azure AI Endpoint** — enter your endpoint URL, API key, and model name
+7. Select a model (or type a custom model ID)
+8. The integration creates a conversation entity — assign it as your Assist agent
+
+### Creating a GitHub PAT for GitHub Models
+
+1. Visit https://github.com/settings/personal-access-tokens/new
+2. Name it (e.g., "HA Conversation Agent")
+3. Under **Permissions**, add **Models → Read**
+4. Generate and copy the token
+
+### Selecting as Assist Agent
+
+1. Go to **Settings → Voice Assistants**
+2. Edit your Assist pipeline (or create a new one)
+3. Under **Conversation agent**, select **GitHub Copilot**
+4. Save — you can now talk to Copilot through Assist
+
+### Multiple Agents
+
+You can create multiple conversation entities with different models or prompts:
+
+1. Go to the integration's page in Settings → Integrations
+2. Click **Add Subentry** → **Conversation**
+3. Configure a custom name, system prompt, temperature, and HA API access
+4. Each subentry creates a separate conversation entity you can assign to different pipelines
+
+### Supported Models (GitHub Models)
+
+| Model | Publisher | Notes |
+|-------|-----------|-------|
+| `openai/gpt-4.1` | OpenAI | High quality, balanced |
+| `openai/gpt-4.1-mini` | OpenAI | Fast, cost-effective (default) |
+| `openai/gpt-5` | OpenAI | Most capable |
+| `openai/gpt-5-mini` | OpenAI | Fast next-gen |
+| `meta/llama-4-scout` | Meta | Open-source |
+| `meta/llama-4-maverick` | Meta | Open-source, larger |
+| `mistral/mistral-large` | Mistral | Strong reasoning |
+| `xai/grok-3` | xAI | Large context |
+| `deepseek/deepseek-r1` | DeepSeek | Reasoning model |
+
+You can also type any custom model ID in `publisher/model-name` format.
+
+### Azure AI Backend
+
+If you have an Azure AI deployment, you can use it instead of GitHub Models:
+
+1. In the config flow, choose **Azure AI Endpoint**
+2. Enter the full endpoint URL (e.g., `https://my-deployment.openai.azure.com/openai/deployments/gpt-4o`)
+3. Enter your API key and model name
+4. The integration uses the same OpenAI-compatible format
+
+### Troubleshooting
+
+#### Integration not appearing
+
+1. Verify `enable_conversation_agent` is true in add-on config
+2. Check add-on logs for "Conversation agent installed"
+3. Restart Home Assistant after first install
+
+#### Authentication errors
+
+1. For GitHub Models: ensure your PAT has the `models:read` permission
+2. For Azure AI: verify the endpoint URL and API key
+3. Check the HA logs for detailed error messages
+
+#### Agent not responding
+
+1. Check that the conversation entity is selected as the Assist agent
+2. Verify the model is available (some have restricted access)
+3. Check rate limits — GitHub Models free tier allows 10-15 requests/minute

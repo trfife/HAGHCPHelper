@@ -414,6 +414,38 @@ fi
 bashio::log.info "Copilot instructions written to /homeassistant/.github/copilot-instructions.md"
 
 # -------------------------------------------------------
+# Install / update conversation agent integration
+# -------------------------------------------------------
+ENABLE_CONV_AGENT=$(bashio::config 'enable_conversation_agent' 'true')
+if bashio::var.true "${ENABLE_CONV_AGENT}"; then
+    INTEGRATION_SRC="/opt/ghcp_conversation"
+    INTEGRATION_DST="/homeassistant/custom_components/ghcp_conversation"
+    if [ -d "${INTEGRATION_SRC}" ]; then
+        SRC_VERSION=$(jq -r '.version' "${INTEGRATION_SRC}/manifest.json" 2>/dev/null || echo "0.0.0")
+        DST_VERSION=$(jq -r '.version' "${INTEGRATION_DST}/manifest.json" 2>/dev/null || echo "0.0.0")
+
+        if [ "${SRC_VERSION}" != "${DST_VERSION}" ]; then
+            bashio::log.info "Installing/updating GitHub Copilot Conversation integration (v${SRC_VERSION})..."
+            mkdir -p "${INTEGRATION_DST}"
+            cp -rf "${INTEGRATION_SRC}/"* "${INTEGRATION_DST}/"
+            bashio::log.info "Conversation agent installed to ${INTEGRATION_DST}"
+            if [ "${DST_VERSION}" = "0.0.0" ]; then
+                bashio::log.notice "NEW: GitHub Copilot Conversation agent installed!"
+                bashio::log.notice "Restart Home Assistant, then go to Settings → Integrations → Add → GitHub Copilot Conversation"
+            else
+                bashio::log.notice "Conversation agent updated from v${DST_VERSION} to v${SRC_VERSION} — restart HA to apply"
+            fi
+        else
+            bashio::log.info "Conversation agent integration is up to date (v${SRC_VERSION})"
+        fi
+    else
+        bashio::log.debug "Conversation agent source not found at ${INTEGRATION_SRC} (not bundled in this build)"
+    fi
+else
+    bashio::log.info "Conversation agent auto-install disabled"
+fi
+
+# -------------------------------------------------------
 # Write environment file for tmux sessions
 # -------------------------------------------------------
 ENV_FILE=/data/copilot-env.sh

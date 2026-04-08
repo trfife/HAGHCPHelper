@@ -6,6 +6,7 @@ Run [GitHub Copilot CLI](https://github.com/github/copilot-cli) — GitHub's age
 
 ## Features
 
+- **Conversation Agent** — Use GitHub Copilot models as an Assist conversation agent to control devices and query states via voice or text
 - **Web Terminal** — Access Copilot CLI through your browser via the HA sidebar (ingress)
 - **Config Access** — Read and write Home Assistant configuration files (YAML, automations, scripts)
 - **HA MCP Integration** — Copilot can query entities, call services, and control your smart home
@@ -62,6 +63,7 @@ Or manually:
 | `nodered_port` | `22` | Node-RED SSH port |
 | `nodered_user` | `root` | Node-RED SSH user |
 | `nodered_path` | `/data` | Node-RED data directory path |
+| `enable_conversation_agent` | `true` | Auto-install conversation agent integration |
 
 ## How It Works
 

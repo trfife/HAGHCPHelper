@@ -62,3 +62,9 @@ configuration:
     description: >-
       Path to Node-RED data directory on the remote server (default: /data).
       This is where flows.json and settings.js are located.
+  enable_conversation_agent:
+    name: Conversation Agent
+    description: >-
+      Automatically install the GitHub Copilot Conversation agent integration
+      into Home Assistant. This registers a conversation entity you can use
+      with Assist to control devices and query states via natural language.

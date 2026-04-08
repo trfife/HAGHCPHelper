@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.1.0
+
+- **Conversation Agent integration** — auto-installs a custom HA integration (`ghcp_conversation`) that registers as a conversation entity
+- Use GitHub Copilot models (via GitHub Models API) or Azure AI endpoints as an Assist conversation agent
+- Full entity control: turn on lights, query sensors, trigger automations — all through natural language
+- Supports tool calling (function calling) for reliable HA actions
+- Config flow UI: Settings → Integrations → Add → "GitHub Copilot Conversation"
+- Two backend options: GitHub Models (PAT with `models:read` scope) or Azure AI (custom endpoint + key)
+- Curated model list: GPT-4.1, GPT-5, Llama 4, Mistral Large, Grok 3, DeepSeek R1, and more
+- Custom system prompts, temperature, and max token controls per conversation agent
+- Subentry support: create multiple conversation agents with different prompts/models
+- New config option: `enable_conversation_agent` (default: true) to control auto-install
+- Integration auto-updates when the add-on updates (version-checked, only copies when changed)
+
 ## 1.0.9
 
 - **Node-RED SSH integration** — connect to a remote Node-RED server and let Copilot edit flows

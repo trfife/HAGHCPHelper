@@ -1,6 +1,6 @@
 ---
 name: "GitHub Copilot CLI"
-version: "1.0.9"
+version: "1.1.0"
 slug: copilot_cli
 description: >-
   Run GitHub Copilot's AI coding agent directly in your Home Assistant
@@ -41,6 +41,7 @@ options:
   nodered_port: 22
   nodered_user: "root"
   nodered_path: "/data"
+  enable_conversation_agent: true
 schema:
   github_token: "password?"
   model: "list(default|claude-sonnet-4.5|claude-sonnet-4|gpt-5)"
@@ -55,5 +56,6 @@ schema:
   nodered_port: "int(1,65535)?"
   nodered_user: "str?"
   nodered_path: "str?"
+  enable_conversation_agent: "bool"
 environment:
   TERM: xterm-256color
