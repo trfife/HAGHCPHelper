@@ -1,0 +1,13 @@
+{
+  "domain": "ghcp_conversation",
+  "name": "GitHub Copilot Conversation",
+  "codeowners": ["@trfife"],
+  "config_flow": true,
+  "dependencies": ["conversation"],
+  "documentation": "https://github.com/trfife/HAGHCPHelper",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/trfife/HAGHCPHelper/issues",
+  "single_config_entry": true,
+  "version": "2.0.0"
+}
