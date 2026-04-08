@@ -17,7 +17,7 @@ _LOGGER = logging.getLogger(__name__)
 
 ACP_PROTOCOL_VERSION = 1
 CLIENT_NAME = "ghcp_conversation"
-CLIENT_VERSION = "2.0.1"
+CLIENT_VERSION = "2.0.2"
 
 
 class ACPError(Exception):
@@ -38,6 +38,8 @@ class ACPClient:
         self._writer: asyncio.StreamWriter | None = None
         self._request_id = 0
         self._session_id: str | None = None
+        self._agent_caps: dict[str, Any] = {}
+        self._initialized = False
 
     # ------------------------------------------------------------------
     # Connection lifecycle
@@ -149,7 +151,20 @@ class ACPClient:
         if "error" in resp:
             err = resp["error"]
             raise ACPError(err.get("message", str(err)), err.get("code", 0))
-        return resp.get("result", {})
+        result = resp.get("result", {})
+        self._agent_caps = result.get("agentCapabilities", {})
+        self._initialized = True
+        return result
+
+    @property
+    def session_id(self) -> str | None:
+        """Return the current session ID, if any."""
+        return self._session_id
+
+    @property
+    def supports_load_session(self) -> bool:
+        """Return True if the agent supports session/load."""
+        return bool(self._agent_caps.get("loadSession"))
 
     async def async_new_session(
         self,
@@ -175,6 +190,71 @@ class ACPClient:
             raise ACPError(err.get("message", str(err)), err.get("code", 0))
         self._session_id = resp["result"]["sessionId"]
         return self._session_id
+
+    async def async_load_session(
+        self,
+        session_id: str,
+        cwd: str = "/homeassistant",
+        mcp_servers: list[dict[str, Any]] | None = None,
+    ) -> bool:
+        """Load an existing ACP session by ID.
+
+        Returns True if the session was loaded, False if not supported
+        or the session does not exist.
+        """
+        if not self.supports_load_session:
+            return False
+
+        req_id = await self._send_request(
+            "session/load",
+            {
+                "sessionId": session_id,
+                "cwd": cwd,
+                "mcpServers": mcp_servers or [],
+            },
+        )
+
+        # The agent replays history as session/update notifications
+        # before sending the final response to session/load.
+        while True:
+            msg = await self._read_line(timeout=30.0)
+            # Final response to session/load
+            if msg.get("id") == req_id:
+                if "error" in msg:
+                    _LOGGER.debug(
+                        "session/load failed: %s", msg["error"].get("message")
+                    )
+                    return False
+                self._session_id = session_id
+                return True
+            # History replay notifications — consume and discard
+            continue
+
+    async def async_ensure_session(
+        self,
+        session_id: str | None = None,
+        cwd: str = "/homeassistant",
+        mcp_servers: list[dict[str, Any]] | None = None,
+    ) -> str:
+        """Resume an existing session or create a new one.
+
+        If *session_id* is given and the agent supports loadSession,
+        tries to reload it. Falls back to creating a new session.
+
+        Returns the active session ID.
+        """
+        if session_id and self.supports_load_session:
+            try:
+                loaded = await self.async_load_session(
+                    session_id, cwd=cwd, mcp_servers=mcp_servers
+                )
+                if loaded:
+                    _LOGGER.debug("Resumed ACP session %s", session_id)
+                    return self._session_id  # type: ignore[return-value]
+            except ACPError:
+                _LOGGER.debug("Could not resume session %s", session_id, exc_info=True)
+
+        return await self.async_new_session(cwd=cwd, mcp_servers=mcp_servers)
 
     async def async_prompt(
         self,

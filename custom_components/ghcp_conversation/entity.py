@@ -88,6 +88,8 @@ class GHCPConversationEntity(ConversationEntity):
         """Initialize the entity."""
         self._config_entry = config_entry
         self._subentry = subentry
+        # Persistent ACP session ID — survives across conversation turns
+        self._acp_session_id: str | None = None
 
         if subentry:
             self._attr_unique_id = f"{config_entry.entry_id}_{subentry.subentry_id}"
@@ -152,13 +154,23 @@ class GHCPConversationEntity(ConversationEntity):
         try:
             await client.async_connect()
             await client.async_initialize()
-            await client.async_new_session(cwd="/homeassistant")
+
+            # Resume or create session — keeps conversation history
+            session_id = await client.async_ensure_session(
+                session_id=self._acp_session_id,
+                cwd="/homeassistant",
+            )
+            self._acp_session_id = session_id
+
             content = await client.async_prompt(user_input.text)
         except ACPError as err:
             _LOGGER.error("ACP error: %s", err)
+            # Reset session on error so next attempt starts fresh
+            self._acp_session_id = None
             content = f"Sorry, I couldn't reach the Copilot CLI: {err}"
         except Exception:
             _LOGGER.exception("Unexpected ACP error")
+            self._acp_session_id = None
             content = "Sorry, an unexpected error occurred with the Copilot CLI."
         finally:
             await client.async_close()
