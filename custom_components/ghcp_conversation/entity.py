@@ -627,11 +627,16 @@ class GHCPConversationEntity(ConversationEntity):
         if not query:
             return json.dumps({"results": [], "message": "Empty query"})
 
-        knowledge = self.hass.data.get(DOMAIN, {}).get("knowledge")
-        if not knowledge:
-            return json.dumps({"results": [], "message": "Knowledge store unavailable"})
+        # Prefer SQLite analytics store, fall back to legacy JSON
+        analytics: AnalyticsStore | None = self.hass.data.get(DOMAIN, {}).get(
+            "analytics"
+        )
+        if analytics:
+            results = await analytics.async_search_knowledge(query)
+        else:
+            knowledge = self.hass.data.get(DOMAIN, {}).get("knowledge")
+            results = knowledge.search(query) if knowledge else []
 
-        results = knowledge.search(query)
         if results:
             _LOGGER.debug(
                 "Knowledge search for '%s' returned %d results", query, len(results)
@@ -704,10 +709,16 @@ class GHCPConversationEntity(ConversationEntity):
                 query[:80],
             )
 
-            # Auto-log to knowledge store
-            knowledge = self.hass.data.get(DOMAIN, {}).get("knowledge")
-            if knowledge:
-                await knowledge.async_add_entry(query, expert_answer)
+            # Auto-log to knowledge store (prefer SQLite)
+            analytics: AnalyticsStore | None = self.hass.data.get(
+                DOMAIN, {}
+            ).get("analytics")
+            if analytics:
+                await analytics.async_add_knowledge(query, expert_answer)
+            else:
+                knowledge = self.hass.data.get(DOMAIN, {}).get("knowledge")
+                if knowledge:
+                    await knowledge.async_add_entry(query, expert_answer)
 
             return json.dumps({"answer": expert_answer})
 

@@ -83,11 +83,19 @@ if bashio::var.true "${ENABLE_MCP}" && bashio::var.has_value "${SUPERVISOR_TOKEN
       "headers": {
         "Authorization": "Bearer ${SUPERVISOR_TOKEN}"
       }
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "env": {
+        "MEMORY_FILE_PATH": "/data/copilot-persist/memory/knowledge-graph.json"
+      }
     }
   }
 }
 MCPEOF
-    bashio::log.info "HA MCP server configured at http://supervisor/core/api/mcp"
+    mkdir -p /data/copilot-persist/memory
+    bashio::log.info "HA MCP + Memory MCP servers configured"
 else
     if bashio::var.true "${ENABLE_MCP}"; then
         bashio::log.warning "MCP enabled but no Supervisor token available"
@@ -152,6 +160,144 @@ SSHEOF
 else
     bashio::log.info "Node-RED integration disabled (no host configured)"
 fi
+
+# -------------------------------------------------------
+# Git config tracking for /homeassistant
+# -------------------------------------------------------
+if command -v git >/dev/null 2>&1; then
+    if [ ! -d /homeassistant/.git ]; then
+        bashio::log.info "Initializing git repo for HA config tracking..."
+        cd /homeassistant
+        git init
+        cat > .gitignore << 'GITEOF'
+# Secrets — never track
+secrets.yaml
+.storage/
+*.db
+*.log
+home-assistant.log*
+# Large / binary files
+*.mp4
+*.jpg
+*.png
+tts/
+www/
+# OS files
+.DS_Store
+Thumbs.db
+GITEOF
+        git add -A
+        git commit -m "initial HA config snapshot $(date -u +%Y-%m-%dT%H:%M:%SZ)" --allow-empty 2>/dev/null || true
+        bashio::log.info "Git repo initialized in /homeassistant"
+    else
+        bashio::log.info "Taking HA config snapshot..."
+        cd /homeassistant
+        git add -A 2>/dev/null
+        git diff --cached --quiet || \
+            git commit -m "snapshot $(date -u +%Y-%m-%dT%H:%M:%SZ)" 2>/dev/null || true
+    fi
+else
+    bashio::log.warning "Git not available — config tracking disabled"
+fi
+
+# -------------------------------------------------------
+# Path-specific Copilot instructions
+# -------------------------------------------------------
+bashio::log.info "Writing path-specific Copilot instructions..."
+mkdir -p /homeassistant/.github/instructions
+
+cat > /homeassistant/.github/instructions/automations.instructions.md << 'AUTOEOF'
+---
+applyTo: "**/automations.yaml"
+---
+# Automation Editing Rules
+
+- automations.yaml uses LIST format (array of automation objects)
+- Each automation MUST have: `id`, `alias`, `trigger`, `action`
+- Use unique `id` values (snake_case, e.g., `motion_hall_light`)
+- Trigger platforms: state, time, sun, template, event, device, zone, numeric_state, webhook
+- Conditions: state, numeric_state, time, template, zone, and/or/not
+- Actions: service calls, delays, conditions, choose, repeat, wait_template
+- After editing, reload with: `curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" http://supervisor/core/api/services/automation/reload`
+- NEVER restart HA just for automation changes — always use reload
+- Validate YAML syntax before saving
+- Keep automations focused — one purpose per automation
+- Use `mode: single|restart|queued|parallel` to control execution behavior
+AUTOEOF
+
+cat > /homeassistant/.github/instructions/debugging.instructions.md << 'DEBUGEOF'
+---
+applyTo: "**/*.log"
+---
+# Debugging & Troubleshooting Procedures
+
+## Checking Logs
+- Primary log: `/homeassistant/home-assistant.log`
+- Via MCP: use the `get_error_log` tool
+- Via API: `curl -sf -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" http://supervisor/core/api/error_log`
+- Filter by component: `grep -i "component_name" /homeassistant/home-assistant.log`
+
+## Common Issues
+- "Entity not available" → check integration, device connection, entity registry
+- "Service not found" → reload integrations, check domain spelling
+- "Template error" → validate Jinja2 syntax, check variable names
+- "Automation not triggering" → check trigger conditions, entity_id spelling, automation enabled state
+
+## Debug Steps
+1. Check entity state: use MCP `get_entity` tool or REST API
+2. Check logs for errors related to the entity/integration
+3. Check automation trace: HA UI → Settings → Automations → select → Traces
+4. Try manual service call to isolate the issue
+5. Check device connectivity (battery, WiFi, Zigbee mesh)
+DEBUGEOF
+
+# -------------------------------------------------------
+# AGENTS.md — Copilot CLI agent modes
+# -------------------------------------------------------
+cat > /homeassistant/.github/AGENTS.md << 'AGENTSEOF'
+# Home Assistant Agent Modes
+
+## Device Controller
+Focus: Entity control, service calls, state queries
+Tools: HA MCP Server (homeassistant)
+Style: Concise, action-oriented responses. Confirm what was done.
+Use when: User wants to control devices, check states, or run quick queries.
+
+## Config Editor
+Focus: YAML editing, validation, configuration management
+Tools: Filesystem + HA MCP (for validation)
+Style: Show diffs, explain changes, always validate before saving.
+Use when: User wants to edit configuration.yaml, automations, scripts, scenes.
+Rules:
+- Always validate YAML syntax before saving
+- Use reload APIs after changes (never restart for YAML-only changes)
+- Never modify secrets.yaml content through chat
+- Show the user what will change before applying
+
+## Automation Builder
+Focus: Creating and debugging automations
+Tools: HA MCP + Sequential thinking
+Style: Walk through trigger → condition → action step by step.
+Use when: User wants to create new automations or fix existing ones.
+Rules:
+- Generate unique automation IDs
+- Include meaningful aliases and descriptions
+- default mode: single (unless user specifies otherwise)
+- Test trigger conditions with manual service calls when possible
+
+## Diagnostics Expert
+Focus: Log analysis, entity debugging, network troubleshooting
+Tools: HA MCP + Memory (for tracking known issues)
+Style: Methodical — gather data, form hypothesis, test, confirm.
+Use when: Something isn't working and needs investigation.
+Rules:
+- Start with logs and entity state
+- Check recent changes (git log)
+- Look for patterns in error frequency
+- Document findings in Memory for future reference
+AGENTSEOF
+
+bashio::log.info "Path instructions and AGENTS.md written"
 
 # -------------------------------------------------------
 # Create HA-specific Copilot instructions
