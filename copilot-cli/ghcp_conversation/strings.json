@@ -92,7 +92,8 @@
     },
     "error": {
       "invalid_auth": "Authentication failed. Check your token or API key.",
-      "cannot_connect": "Could not connect to the API. Check the endpoint and try again.",
+      "cannot_connect": "Could not connect to the Copilot CLI. Check the host and port.",
+      "azure_cannot_connect": "Could not connect to the Azure endpoint. Check the URL, API key, and deployment name.",
       "unknown": "An unexpected error occurred.",
       "not_yet_authorized": "Not authorized yet. Complete the steps above in your browser, then click Submit again."
     },

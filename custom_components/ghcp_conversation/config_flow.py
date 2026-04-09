@@ -233,7 +233,8 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
                 try:
                     async with aiohttp.ClientSession() as session:
                         az_client = build_azure_client(
-                            session, azure_endpoint, azure_key
+                            session, azure_endpoint, azure_key,
+                            model=router_model,
                         )
                         await az_client.async_validate(router_model)
                 except APIError as err:
@@ -241,9 +242,10 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
                     if err.status in (401, 403):
                         errors["base"] = "invalid_auth"
                     else:
-                        errors[CONF_AZURE_ROUTER_ENDPOINT] = "cannot_connect"
+                        errors["base"] = "azure_cannot_connect"
                 except Exception:
-                    errors[CONF_AZURE_ROUTER_ENDPOINT] = "cannot_connect"
+                    _LOGGER.exception("Azure validation unexpected error")
+                    errors["base"] = "azure_cannot_connect"
 
             if not errors:
                 self._data[CONF_ACP_HOST] = host

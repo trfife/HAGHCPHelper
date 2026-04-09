@@ -133,6 +133,7 @@ class GHCPConversationEntity(ConversationEntity):
                 session,
                 data[CONF_AZURE_ENDPOINT],
                 data[CONF_AZURE_API_KEY],
+                model=data.get(CONF_MODEL, ""),
             )
         return build_github_client(session, data[CONF_GITHUB_TOKEN])
 
@@ -320,7 +321,7 @@ class GHCPConversationEntity(ConversationEntity):
         tools = self._build_tools(chat_log)
 
         async with aiohttp.ClientSession() as session:
-            client = build_azure_client(session, endpoint, api_key)
+            client = build_azure_client(session, endpoint, api_key, model=model)
 
             for _iteration in range(MAX_TOOL_ITERATIONS):
                 response = await client.async_chat_completion(

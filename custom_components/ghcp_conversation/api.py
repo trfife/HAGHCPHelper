@@ -13,6 +13,9 @@ from .const import GITHUB_API_VERSION, GITHUB_CATALOG_URL, GITHUB_MODELS_URL
 _LOGGER = logging.getLogger(__name__)
 
 
+AZURE_API_VERSION = "2025-01-01-preview"
+
+
 class APIError(Exception):
     """API error with status code."""
 
@@ -118,12 +121,34 @@ def build_github_client(
 
 
 def build_azure_client(
-    session: aiohttp.ClientSession, endpoint: str, api_key: str
+    session: aiohttp.ClientSession, endpoint: str, api_key: str,
+    model: str = "",
 ) -> ChatCompletionClient:
-    """Create a client for Azure AI endpoint."""
+    """Create a client for Azure OpenAI endpoint.
+
+    Accepts either:
+      - Full URL: https://X.openai.azure.com/openai/deployments/D/chat/completions?api-version=...
+      - Base URL: https://X.openai.azure.com  (model/deployment name passed separately)
+      - Base + path: https://X.openai.azure.com/openai/deployments/D
+    """
     url = endpoint.rstrip("/")
-    if not url.endswith("/chat/completions"):
+
+    if "/chat/completions" in url:
+        # Full URL provided — use as-is
+        pass
+    elif "/openai/deployments/" in url:
+        # Has deployment path but no chat/completions suffix
+        url = f"{url}/chat/completions?api-version={AZURE_API_VERSION}"
+    elif model:
+        # Base URL + model name → construct full Azure OpenAI path
+        url = (
+            f"{url}/openai/deployments/{model}"
+            f"/chat/completions?api-version={AZURE_API_VERSION}"
+        )
+    else:
+        # Bare base URL, no model — append generic chat/completions
         url = f"{url}/chat/completions"
+
     return ChatCompletionClient(
         session, base_url=url, api_key=api_key, is_github=False
     )
