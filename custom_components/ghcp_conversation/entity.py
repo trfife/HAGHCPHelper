@@ -27,16 +27,21 @@ from homeassistant.helpers import intent, llm
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .acp_client import ACPClient, ACPError
+from .analytics import AnalyticsStore, RequestMetrics
 from .api import APIError, ChatCompletionClient, build_azure_client, build_github_client
 from .const import (
     ACP_DEFAULT_PORT,
     BACKEND_AZURE,
     BACKEND_COPILOT_CLI,
     BACKEND_GITHUB,
+    BACKEND_HYBRID,
     CONF_ACP_HOST,
     CONF_ACP_PORT,
     CONF_AZURE_API_KEY,
     CONF_AZURE_ENDPOINT,
+    CONF_AZURE_ROUTER_ENDPOINT,
+    CONF_AZURE_ROUTER_KEY,
+    CONF_AZURE_ROUTER_MODEL,
     CONF_BACKEND,
     CONF_EXPERT_MODEL,
     CONF_GITHUB_TOKEN,
@@ -44,6 +49,7 @@ from .const import (
     CONF_MODEL,
     CONF_PROMPT,
     CONF_TEMPERATURE,
+    DEFAULT_AZURE_ROUTER_MODEL,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
     DEFAULT_PROMPT,
@@ -54,6 +60,7 @@ from .const import (
     ORCHESTRATOR_PROMPT_SUFFIX,
     SUBENTRY_TYPE_CONVERSATION,
 )
+from .router import Route, classify_intent
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -142,6 +149,10 @@ class GHCPConversationEntity(ConversationEntity):
         if backend == BACKEND_COPILOT_CLI:
             return await self._async_handle_acp(user_input, chat_log, data)
 
+        # Hybrid mode — router decides: local → azure → cli fallback
+        if backend == BACKEND_HYBRID:
+            return await self._async_handle_hybrid(user_input, chat_log, data)
+
         return await self._async_handle_direct_api(user_input, chat_log, data)
 
     async def _async_handle_acp(
@@ -178,6 +189,180 @@ class GHCPConversationEntity(ConversationEntity):
             content = "Sorry, an unexpected error occurred with the Copilot CLI."
         finally:
             await client.async_close()
+
+        chat_log.async_add_assistant_content_without_tools(
+            AssistantContent(agent_id=user_input.agent_id, content=content)
+        )
+        response_obj = intent.IntentResponse(language=user_input.language)
+        response_obj.async_set_speech(content)
+        return ConversationResult(
+            response=response_obj,
+            conversation_id=chat_log.conversation_id,
+        )
+
+    async def _async_handle_hybrid(
+        self,
+        user_input: ConversationInput,
+        chat_log: ChatLog,
+        data: dict[str, Any],
+    ) -> ConversationResult:
+        """Hybrid routing: local → Azure fast model → CLI expert fallback."""
+        analytics: AnalyticsStore | None = self.hass.data.get(DOMAIN, {}).get(
+            "analytics"
+        )
+        metrics = RequestMetrics()
+
+        decision = classify_intent(user_input.text)
+        metrics.route = decision.route.value
+
+        _LOGGER.info(
+            "Hybrid router: route=%s pattern=%s prompt='%s'",
+            decision.route.value,
+            decision.matched_pattern,
+            user_input.text[:80],
+        )
+
+        try:
+            if decision.route == Route.LOCAL:
+                # ── Fast local path: direct HA tool call via LLM API ─────
+                result = await self._async_handle_direct_api(
+                    user_input, chat_log, data
+                )
+                metrics.model = data.get(CONF_MODEL, DEFAULT_MODEL)
+                return result
+
+            if decision.route == Route.AZURE:
+                # ── Azure fast model for moderate queries ─────────────────
+                router_endpoint = data.get(CONF_AZURE_ROUTER_ENDPOINT)
+                router_key = data.get(CONF_AZURE_ROUTER_KEY)
+
+                if router_endpoint and router_key:
+                    try:
+                        router_model = data.get(
+                            CONF_AZURE_ROUTER_MODEL, DEFAULT_AZURE_ROUTER_MODEL
+                        )
+                        metrics.model = router_model
+                        result = await self._async_handle_azure_fast(
+                            user_input, chat_log, data,
+                            router_endpoint, router_key, router_model,
+                        )
+                        return result
+                    except (APIError, Exception) as err:
+                        _LOGGER.warning(
+                            "Azure fast model failed, falling back to CLI: %s",
+                            err,
+                        )
+                        # Fall through to CLI
+                else:
+                    _LOGGER.debug(
+                        "No Azure router configured, falling back to direct API"
+                    )
+                    result = await self._async_handle_direct_api(
+                        user_input, chat_log, data
+                    )
+                    metrics.model = data.get(CONF_MODEL, DEFAULT_MODEL)
+                    return result
+
+            # ── CLI expert fallback (Route.CLI or Azure failed) ──────────
+            metrics.route = Route.CLI.value
+            metrics.model = "copilot-cli"
+            return await self._async_handle_acp(user_input, chat_log, data)
+
+        except Exception as err:
+            _LOGGER.exception("Hybrid routing error")
+            metrics.success = False
+            metrics.error_msg = str(err)
+
+            chat_log.async_add_assistant_content_without_tools(
+                AssistantContent(
+                    agent_id=user_input.agent_id,
+                    content="Sorry, an error occurred processing your request.",
+                )
+            )
+            response_obj = intent.IntentResponse(language=user_input.language)
+            response_obj.async_set_speech(
+                "Sorry, an error occurred processing your request."
+            )
+            return ConversationResult(
+                response=response_obj,
+                conversation_id=chat_log.conversation_id,
+            )
+        finally:
+            if analytics:
+                await analytics.async_log(user_input.text, metrics)
+
+    async def _async_handle_azure_fast(
+        self,
+        user_input: ConversationInput,
+        chat_log: ChatLog,
+        data: dict[str, Any],
+        endpoint: str,
+        api_key: str,
+        model: str,
+    ) -> ConversationResult:
+        """Handle a request through the Azure AI Foundry fast model."""
+        temperature = data.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE)
+        max_tokens = int(data.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS))
+        system_prompt = data.get(CONF_PROMPT, DEFAULT_PROMPT)
+
+        # Provide HA LLM tools
+        llm_api_ids = data.get(CONF_LLM_HASS_API) or [llm.LLM_API_ASSIST]
+        await chat_log.async_provide_llm_data(
+            user_input.as_llm_context(DOMAIN),
+            llm_api_ids,
+            system_prompt,
+            user_input.extra_system_prompt,
+        )
+        if chat_log.llm_api:
+            system_prompt = chat_log.llm_api.prompt
+
+        messages = self._build_messages(system_prompt, chat_log)
+        tools = self._build_tools(chat_log)
+
+        async with aiohttp.ClientSession() as session:
+            client = build_azure_client(session, endpoint, api_key)
+
+            for _iteration in range(MAX_TOOL_ITERATIONS):
+                response = await client.async_chat_completion(
+                    model=model,
+                    messages=messages,
+                    tools=tools or None,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+
+                choice = response.get("choices", [{}])[0]
+                message = choice.get("message", {})
+                content = message.get("content", "")
+                tool_calls = message.get("tool_calls")
+
+                if not tool_calls:
+                    break
+
+                messages.append(message)
+                for tc in tool_calls:
+                    func = tc.get("function", {})
+                    tool_name = func.get("name", "")
+                    tool_args_str = func.get("arguments", "{}")
+                    try:
+                        tool_args = json.loads(tool_args_str)
+                    except json.JSONDecodeError:
+                        tool_args = {}
+
+                    tool_result = await self._execute_tool(
+                        chat_log, tool_name, tool_args, user_input,
+                        session, data,
+                    )
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc["id"],
+                        "content": tool_result,
+                    })
+            else:
+                content = (
+                    "I'm sorry, I reached the maximum number of tool calls. "
+                    "Please try a simpler request."
+                )
 
         chat_log.async_add_assistant_content_without_tools(
             AssistantContent(agent_id=user_input.agent_id, content=content)

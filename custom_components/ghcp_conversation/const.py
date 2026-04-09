@@ -20,12 +20,19 @@ AUTH_METHOD_PAT = "pat"
 BACKEND_GITHUB = "github_models"
 BACKEND_AZURE = "azure_ai"
 BACKEND_COPILOT_CLI = "copilot_cli"
+BACKEND_HYBRID = "hybrid"
 
 # ACP (Agent Client Protocol) settings for Copilot CLI add-on
 CONF_ACP_HOST = "acp_host"
 CONF_ACP_PORT = "acp_port"
 ACP_DEFAULT_PORT = 3000
 ADDON_SLUG = "copilot_cli"
+
+# Azure AI Foundry router settings (used by hybrid backend)
+CONF_AZURE_ROUTER_ENDPOINT = "azure_router_endpoint"
+CONF_AZURE_ROUTER_KEY = "azure_router_key"
+CONF_AZURE_ROUTER_MODEL = "azure_router_model"
+DEFAULT_AZURE_ROUTER_MODEL = "gpt-4.1-mini"
 
 # Register an OAuth App at https://github.com/settings/applications/new
 # Enable "Device Flow" on the app settings page.  Paste the Client ID here.
