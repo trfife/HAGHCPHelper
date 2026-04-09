@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.0.9
+
+- **Fix: terminal copy/paste** — disabled tmux mouse capture by default so browser-native copy/paste works in the HA ingress iframe
+- Added `Ctrl+b m` keybinding to toggle mouse mode on/off (enable for wheel scrolling when needed)
+- Removed complex WheelUpPane/WheelDownPane bindings in favor of simpler keyboard scrolling (`Ctrl+b [`)
+- Updated docs with new copy/paste and scrolling instructions
+
 ## 3.0.8
 
 - **Train of thought logging** — every conversation turn now logs a full reasoning trace to the `conversation_trace` SQLite table

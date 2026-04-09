@@ -37,8 +37,8 @@ configuration:
   session_persistence:
     name: Session Persistence
     description: >-
-      Use tmux to keep your session alive when navigating away. Disable for
-      simpler terminal behavior with native browser copy/paste.
+      Use tmux to keep your session alive when navigating away. Copy/paste
+      works natively; use Ctrl+b m to toggle mouse scrolling.
   auto_update:
     name: Auto-Update
     description: >-

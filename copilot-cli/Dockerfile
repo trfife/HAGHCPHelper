@@ -57,7 +57,7 @@ RUN case "${BUILD_ARCH}" in \
 # Configure tmux
 RUN cat > /root/.tmux.conf << 'EOF'
 set-option -g history-limit 50000
-set-option -g mouse on
+set-option -g mouse off
 set-option -g default-terminal "screen-256color"
 set-option -ga terminal-overrides ',xterm*:smcup@:rmcup@'
 set-option -g status on
@@ -67,8 +67,8 @@ set-option -g status-left " #[fg=#58a6ff,bold]Copilot CLI #[fg=#484f58]| "
 set-option -g status-right "#[fg=#484f58]Session: #[fg=#3fb950]#{session_name} "
 set-option -g allow-rename off
 set-option -sg escape-time 10
-bind -n WheelUpPane if-shell -F -t = "#{mouse_any_flag}" "send-keys -M" "if -Ft= '#{pane_in_mode}' 'send-keys -M' 'select-pane -t=; copy-mode -e; send-keys -M'"
-bind -n WheelDownPane select-pane -t= \; send-keys -M
+# Ctrl+b m — toggle mouse mode (ON for scrolling, OFF for copy/paste)
+bind m set-option -g mouse \; display-message "Mouse: #{?mouse,ON,OFF}"
 EOF
 
 # Configure bash with aliases and prompt

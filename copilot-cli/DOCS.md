@@ -14,7 +14,7 @@ On first launch, Copilot CLI will prompt you to authenticate:
 6. Enter the device code and authorize
 7. Your credentials are saved in persistent storage
 
-**Tip:** If the URL wraps across lines, hold `Ctrl+Shift` while selecting with your mouse to copy it.
+**Tip:** Select text with your mouse and press `Ctrl+C` (or `Cmd+C`) to copy. If the URL wraps across lines, select across multiple lines.
 
 ### Personal Access Token (PAT)
 
@@ -53,7 +53,23 @@ When `session_persistence` is enabled (default), the add-on uses tmux:
 
 - Your session survives browser refreshes and disconnects
 - Long-running Copilot tasks continue in the background
-- Mouse wheel scrolling works (auto-enters copy mode)
+- Use `Ctrl+b [` to enter scroll mode (arrow keys / PgUp / PgDn to navigate, `q` to exit)
+
+### Copy and Paste
+
+Copy and paste works natively — select text with your mouse and use `Ctrl+C` (or `Cmd+C` on Mac) to copy, `Ctrl+V` to paste. No special key combinations needed.
+
+### Mouse Scrolling
+
+Mouse scrolling is off by default so that browser-native copy/paste works. To toggle mouse mode on (for wheel scrolling):
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+b m` | Toggle mouse mode ON/OFF |
+| `Ctrl+b [` | Enter scroll mode (keyboard) |
+| `q` | Exit scroll mode |
+
+When mouse mode is ON, hold `Shift` while selecting to use browser copy.
 
 ### tmux Commands
 
@@ -61,17 +77,8 @@ When `session_persistence` is enabled (default), the add-on uses tmux:
 |----------|--------|
 | `Ctrl+b d` | Detach from session (keeps it running) |
 | `Ctrl+b [` | Enter scroll/copy mode |
-| Mouse wheel | Scroll up/down |
+| `Ctrl+b m` | Toggle mouse mode |
 | `q` | Exit scroll/copy mode |
-
-### Copy and Paste in tmux
-
-Since tmux captures mouse events:
-
-| Action | Shortcut |
-|--------|----------|
-| Copy | Hold `Ctrl+Shift` while selecting text |
-| Paste | `Shift+Insert` or `Ctrl+Shift+V` |
 
 ## File Locations
 
