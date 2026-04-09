@@ -17,7 +17,7 @@ _LOGGER = logging.getLogger(__name__)
 
 ACP_PROTOCOL_VERSION = 1
 CLIENT_NAME = "ghcp_conversation"
-CLIENT_VERSION = "2.0.2"
+CLIENT_VERSION = "2.2.0"
 
 
 class ACPError(Exception):

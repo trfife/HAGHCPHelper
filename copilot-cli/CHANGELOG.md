@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.2.0
+
+- **Fix: ACP server now respects model config** — the `model` option from add-on settings is now passed to `copilot --acp --model <model>`, matching the ttyd terminal behavior
+- **Updated model list** — config schema now includes all available Copilot CLI models: GPT-5 mini, GPT-4.1, GPT-5.4, Claude Haiku/Sonnet/Opus families
+- **Default model changed to `gpt-5-mini`** — fastest available model (0x cost) for routine tasks
+- Fixed fallback model names — removed non-existent `openai/gpt-5-nano` and `openai/gpt-4.1-nano`
+
 ## 2.1.0
 
 - **Orchestrator mode with expert escalation** — fast model (default: gpt-5-nano) handles simple tasks directly; complex questions are escalated to a configurable expert model (e.g., Claude Opus 4.6) via synthetic `ask_expert` tool

@@ -47,12 +47,26 @@ while true; do
 done
 
 # -------------------------------------------------------
+# Read model preference from add-on config
+# -------------------------------------------------------
+MODEL=$(bashio::config 'model' 'default')
+
+# -------------------------------------------------------
 # Inherit environment (GH_TOKEN, SUPERVISOR_TOKEN, etc.)
 # The env file is written by the ttyd service start-up.
 # -------------------------------------------------------
 if [ -f /data/copilot-env.sh ]; then
     # shellcheck disable=SC1091
     source /data/copilot-env.sh
+fi
+
+# -------------------------------------------------------
+# Build CLI arguments
+# -------------------------------------------------------
+COPILOT_ARGS="--acp --port ${ACP_PORT} --allow-all-tools"
+if [ "${MODEL}" != "default" ] && [ -n "${MODEL}" ]; then
+    COPILOT_ARGS="${COPILOT_ARGS} --model ${MODEL}"
+    bashio::log.info "ACP server using model: ${MODEL}"
 fi
 
 bashio::log.info "Starting Copilot ACP server on port ${ACP_PORT}..."
@@ -62,4 +76,4 @@ bashio::log.info "Starting Copilot ACP server on port ${ACP_PORT}..."
 # -------------------------------------------------------
 cd /homeassistant || cd /root
 
-exec copilot --acp --port "${ACP_PORT}" --allow-all-tools
+exec copilot ${COPILOT_ARGS}

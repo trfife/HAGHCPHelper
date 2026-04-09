@@ -35,18 +35,19 @@ GITHUB_MODELS_URL = "https://models.github.ai/inference/chat/completions"
 GITHUB_CATALOG_URL = "https://models.github.ai/catalog/models"
 GITHUB_API_VERSION = "2026-03-10"
 
-DEFAULT_MODEL = "openai/gpt-5-nano"
+DEFAULT_MODEL = "gpt-5-mini"
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_MAX_TOKENS = 4096
 
 # Fallback models when catalog API is unavailable
 FALLBACK_MODELS = [
-    "openai/gpt-5-nano",
-    "openai/gpt-5-mini",
-    "openai/gpt-5",
-    "openai/gpt-4.1-nano",
-    "openai/gpt-4.1-mini",
-    "openai/gpt-4.1",
+    "gpt-5-mini",
+    "gpt-4.1",
+    "gpt-5.4-mini",
+    "claude-haiku-4.5",
+    "gpt-5.4",
+    "claude-sonnet-4.6",
+    "claude-opus-4.6",
 ]
 
 DEFAULT_PROMPT = (
