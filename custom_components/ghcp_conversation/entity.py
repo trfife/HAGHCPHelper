@@ -128,14 +128,23 @@ class GHCPConversationEntity(ConversationEntity):
         data = self._entry_data
         backend = data.get(CONF_BACKEND, BACKEND_GITHUB)
 
-        if backend == BACKEND_AZURE:
-            return build_azure_client(
-                session,
-                data[CONF_AZURE_ENDPOINT],
-                data[CONF_AZURE_API_KEY],
-                model=data.get(CONF_MODEL, ""),
+        if backend in (BACKEND_AZURE, BACKEND_HYBRID):
+            # For hybrid, use the Azure router creds if available, else Azure creds
+            endpoint = data.get(CONF_AZURE_ROUTER_ENDPOINT) or data.get(
+                CONF_AZURE_ENDPOINT, ""
             )
-        return build_github_client(session, data[CONF_GITHUB_TOKEN])
+            api_key = data.get(CONF_AZURE_ROUTER_KEY) or data.get(
+                CONF_AZURE_API_KEY, ""
+            )
+            model = (
+                data.get(CONF_AZURE_ROUTER_MODEL)
+                or data.get(CONF_MODEL, "")
+            )
+            if endpoint and api_key:
+                return build_azure_client(
+                    session, endpoint, api_key, model=model,
+                )
+        return build_github_client(session, data.get(CONF_GITHUB_TOKEN, ""))
 
     async def _async_handle_message(
         self,
@@ -225,12 +234,28 @@ class GHCPConversationEntity(ConversationEntity):
 
         try:
             if decision.route == Route.LOCAL:
-                # ── Fast local path: direct HA tool call via LLM API ─────
-                result = await self._async_handle_direct_api(
-                    user_input, chat_log, data
-                )
-                metrics.model = data.get(CONF_MODEL, DEFAULT_MODEL)
-                return result
+                # ── Fast local path: use Azure for tool-calling ──────────
+                router_endpoint = data.get(CONF_AZURE_ROUTER_ENDPOINT)
+                router_key = data.get(CONF_AZURE_ROUTER_KEY)
+
+                if router_endpoint and router_key:
+                    router_model = data.get(
+                        CONF_AZURE_ROUTER_MODEL, DEFAULT_AZURE_ROUTER_MODEL
+                    )
+                    metrics.model = router_model
+                    result = await self._async_handle_azure_fast(
+                        user_input, chat_log, data,
+                        router_endpoint, router_key, router_model,
+                    )
+                    return result
+                else:
+                    # No Azure — fall through to CLI for LOCAL too
+                    _LOGGER.debug("No Azure router, sending LOCAL to CLI")
+                    metrics.route = Route.CLI.value
+                    metrics.model = "copilot-cli"
+                    return await self._async_handle_acp(
+                        user_input, chat_log, data
+                    )
 
             if decision.route == Route.AZURE:
                 # ── Azure fast model for moderate queries ─────────────────
@@ -248,21 +273,14 @@ class GHCPConversationEntity(ConversationEntity):
                             router_endpoint, router_key, router_model,
                         )
                         return result
-                    except (APIError, Exception) as err:
+                    except Exception as err:
                         _LOGGER.warning(
                             "Azure fast model failed, falling back to CLI: %s",
                             err,
                         )
-                        # Fall through to CLI
+                        # Fall through to CLI — but need fresh chat_log state
                 else:
-                    _LOGGER.debug(
-                        "No Azure router configured, falling back to direct API"
-                    )
-                    result = await self._async_handle_direct_api(
-                        user_input, chat_log, data
-                    )
-                    metrics.model = data.get(CONF_MODEL, DEFAULT_MODEL)
-                    return result
+                    _LOGGER.debug("No Azure router configured, using CLI")
 
             # ── CLI expert fallback (Route.CLI or Azure failed) ──────────
             metrics.route = Route.CLI.value

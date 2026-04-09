@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.0.2
+
+- **Fix: Hybrid routing now works for all 3 tiers** — LOCAL and AZURE routes now correctly use the Azure router credentials instead of trying to use missing GitHub token
+- `_get_client()` handles `BACKEND_HYBRID` by using Azure router endpoint/key
+- LOCAL route in hybrid mode uses Azure fast model (not direct API which requires GitHub token)
+- Graceful fallthrough: if no Azure credentials configured, all routes go to CLI
+- Better error logging for debugging route failures
+
 ## 3.0.1
 
 - **Fix: Azure OpenAI endpoint URL construction** — base URLs like `https://barnabeefoundry.cognitiveservices.azure.com` now correctly build the full `/openai/deployments/{model}/chat/completions?api-version=...` path
