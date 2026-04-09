@@ -1,6 +1,18 @@
 # Changelog
 
-## 2.0.0
+## 2.1.0
+
+- **Orchestrator mode with expert escalation** — fast model (default: gpt-5-nano) handles simple tasks directly; complex questions are escalated to a configurable expert model (e.g., Claude Opus 4.6) via synthetic `ask_expert` tool
+- **Persistent knowledge memory** — every expert answer is auto-logged to a knowledge store (`.storage/ghcp_conversation.knowledge`); the fast model checks `search_knowledge` before escalating, learning from past answers and avoiding redundant expert calls
+- New `expert_model` config option in setup flow, options flow, and per-agent subentry overrides
+- Knowledge store uses HA's `Store` helper — persists across restarts, FIFO eviction at 200 entries
+- Keyword-based search with stopword filtering for knowledge retrieval
+- System prompt automatically augmented with orchestrator instructions when expert model is configured
+- Updated default model from `gpt-4.1-mini` to `gpt-5-nano` (fastest with reasoning)
+- Updated fallback model list to include gpt-5 family
+- Fully backward compatible — no expert model configured = existing behavior unchanged
+
+## 2.0.2
 
 - **Major: Copilot CLI ACP integration** — conversation agent now routes through the Copilot CLI add-on via the Agent Client Protocol (ACP) for full AI capabilities
 - New `copilot_cli` backend: connects to `copilot --acp --port 3000` running as an s6 service inside the add-on container

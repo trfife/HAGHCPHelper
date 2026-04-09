@@ -38,6 +38,7 @@ from .const import (
     CONF_AZURE_API_KEY,
     CONF_AZURE_ENDPOINT,
     CONF_BACKEND,
+    CONF_EXPERT_MODEL,
     CONF_GITHUB_TOKEN,
     CONF_MAX_TOKENS,
     CONF_MODEL,
@@ -48,6 +49,9 @@ from .const import (
     DEFAULT_PROMPT,
     DEFAULT_TEMPERATURE,
     DOMAIN,
+    EXPERT_TOOL_NAME,
+    KNOWLEDGE_TOOL_NAME,
+    ORCHESTRATOR_PROMPT_SUFFIX,
     SUBENTRY_TYPE_CONVERSATION,
 )
 
@@ -196,6 +200,7 @@ class GHCPConversationEntity(ConversationEntity):
         temperature = data.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE)
         max_tokens = int(data.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS))
         system_prompt = data.get(CONF_PROMPT, DEFAULT_PROMPT)
+        expert_model = data.get(CONF_EXPERT_MODEL, "")
 
         # Provide HA LLM tools to the chat log
         # Default to the Assist API so every agent can control HA out of the box
@@ -210,11 +215,15 @@ class GHCPConversationEntity(ConversationEntity):
         if chat_log.llm_api:
             system_prompt = chat_log.llm_api.prompt
 
+        # Append orchestrator instructions when expert model is configured
+        if expert_model:
+            system_prompt += ORCHESTRATOR_PROMPT_SUFFIX
+
         # Build messages from chat log
         messages = self._build_messages(system_prompt, chat_log)
 
-        # Build tools from LLM API
-        tools = self._build_tools(chat_log)
+        # Build tools from LLM API (+ synthetic orchestrator tools)
+        tools = self._build_tools(chat_log, expert_model)
 
         async with aiohttp.ClientSession() as session:
             client = self._get_client(session)
@@ -255,7 +264,8 @@ class GHCPConversationEntity(ConversationEntity):
                         )
 
                         tool_result = await self._execute_tool(
-                            chat_log, tool_name, tool_args, user_input
+                            chat_log, tool_name, tool_args, user_input,
+                            session, data,
                         )
 
                         messages.append(
@@ -315,23 +325,74 @@ class GHCPConversationEntity(ConversationEntity):
 
         return messages
 
-    def _build_tools(self, chat_log: ChatLog) -> list[dict[str, Any]] | None:
-        """Build tool definitions from the LLM API."""
-        if not chat_log.llm_api or not chat_log.llm_api.tools:
-            return None
-
+    def _build_tools(
+        self, chat_log: ChatLog, expert_model: str = ""
+    ) -> list[dict[str, Any]] | None:
+        """Build tool definitions from the LLM API + synthetic orchestrator tools."""
         tools: list[dict[str, Any]] = []
-        for tool in chat_log.llm_api.tools:
-            tool_def: dict[str, Any] = {
+
+        if chat_log.llm_api and chat_log.llm_api.tools:
+            for tool in chat_log.llm_api.tools:
+                tool_def: dict[str, Any] = {
+                    "type": "function",
+                    "function": {
+                        "name": tool.name,
+                        "description": tool.description or "",
+                    },
+                }
+                if tool.parameters:
+                    tool_def["function"]["parameters"] = tool.parameters
+                tools.append(tool_def)
+
+        # Inject orchestrator tools when expert model is configured
+        if expert_model:
+            tools.append({
                 "type": "function",
                 "function": {
-                    "name": tool.name,
-                    "description": tool.description or "",
+                    "name": KNOWLEDGE_TOOL_NAME,
+                    "description": (
+                        "Search past expert answers for similar questions. "
+                        "Use this BEFORE ask_expert to check if a good answer "
+                        "already exists."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "The search query.",
+                            }
+                        },
+                        "required": ["query"],
+                    },
                 },
-            }
-            if tool.parameters:
-                tool_def["function"]["parameters"] = tool.parameters
-            tools.append(tool_def)
+            })
+            tools.append({
+                "type": "function",
+                "function": {
+                    "name": EXPERT_TOOL_NAME,
+                    "description": (
+                        "Delegate a complex question to a more powerful AI "
+                        "model for deeper reasoning, analysis, or planning. "
+                        "Only use when search_knowledge found nothing relevant "
+                        "AND the task requires deep reasoning, or when the user "
+                        "explicitly asks for expert help."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": (
+                                    "The full question or task to send to "
+                                    "the expert model."
+                                ),
+                            }
+                        },
+                        "required": ["query"],
+                    },
+                },
+            })
 
         return tools if tools else None
 
@@ -341,8 +402,21 @@ class GHCPConversationEntity(ConversationEntity):
         tool_name: str,
         tool_args: dict[str, Any],
         user_input: ConversationInput,
+        http_session: aiohttp.ClientSession | None = None,
+        data: dict[str, Any] | None = None,
     ) -> str:
-        """Execute a single tool call via the HA LLM API."""
+        """Execute a single tool call via the HA LLM API or synthetic tools."""
+        # --- Synthetic tool: search_knowledge ---
+        if tool_name == KNOWLEDGE_TOOL_NAME:
+            return await self._handle_search_knowledge(tool_args)
+
+        # --- Synthetic tool: ask_expert ---
+        if tool_name == EXPERT_TOOL_NAME:
+            return await self._handle_ask_expert(
+                tool_args, chat_log, user_input, http_session, data
+            )
+
+        # --- Standard HA LLM tool ---
         if not chat_log.llm_api:
             return json.dumps({"error": "No LLM API configured"})
 
@@ -359,3 +433,102 @@ class GHCPConversationEntity(ConversationEntity):
         except Exception:
             _LOGGER.exception("Unexpected error executing tool %s", tool_name)
             return json.dumps({"error": f"Failed to execute {tool_name}"})
+
+    async def _handle_search_knowledge(
+        self, tool_args: dict[str, Any]
+    ) -> str:
+        """Search the knowledge store for past expert answers."""
+        query = tool_args.get("query", "")
+        if not query:
+            return json.dumps({"results": [], "message": "Empty query"})
+
+        knowledge = self.hass.data.get(DOMAIN, {}).get("knowledge")
+        if not knowledge:
+            return json.dumps({"results": [], "message": "Knowledge store unavailable"})
+
+        results = knowledge.search(query)
+        if results:
+            _LOGGER.debug(
+                "Knowledge search for '%s' returned %d results", query, len(results)
+            )
+            return json.dumps({
+                "results": [
+                    {"query": r["query"], "answer": r["answer"]}
+                    for r in results
+                ]
+            })
+        return json.dumps({"results": [], "message": "No relevant knowledge found"})
+
+    async def _handle_ask_expert(
+        self,
+        tool_args: dict[str, Any],
+        chat_log: ChatLog,
+        user_input: ConversationInput,
+        http_session: aiohttp.ClientSession | None,
+        data: dict[str, Any] | None,
+    ) -> str:
+        """Escalate a question to the expert model and log the result."""
+        query = tool_args.get("query", "")
+        if not query:
+            return json.dumps({"error": "Empty query"})
+
+        data = data or self._entry_data
+        expert_model = data.get(CONF_EXPERT_MODEL, "")
+        if not expert_model:
+            return json.dumps({"error": "No expert model configured"})
+
+        # Build context for the expert: system prompt + conversation history + query
+        system_prompt = data.get(CONF_PROMPT, DEFAULT_PROMPT)
+        if chat_log.llm_api:
+            system_prompt = chat_log.llm_api.prompt
+
+        expert_messages: list[dict[str, Any]] = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": query},
+        ]
+
+        try:
+            # Use existing session or create a new one
+            if http_session:
+                client = self._get_client(http_session)
+                response = await client.async_chat_completion(
+                    model=expert_model,
+                    messages=expert_messages,
+                    temperature=data.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE),
+                    max_tokens=int(data.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS)),
+                )
+            else:
+                async with aiohttp.ClientSession() as session:
+                    client = self._get_client(session)
+                    response = await client.async_chat_completion(
+                        model=expert_model,
+                        messages=expert_messages,
+                        temperature=data.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE),
+                        max_tokens=int(data.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS)),
+                    )
+
+            choice = response.get("choices", [{}])[0]
+            expert_answer = choice.get("message", {}).get("content", "")
+
+            if not expert_answer:
+                return json.dumps({"error": "Expert model returned empty response"})
+
+            _LOGGER.info(
+                "Expert escalation: model=%s, query='%s'",
+                expert_model,
+                query[:80],
+            )
+
+            # Auto-log to knowledge store
+            knowledge = self.hass.data.get(DOMAIN, {}).get("knowledge")
+            if knowledge:
+                await knowledge.async_add_entry(query, expert_answer)
+
+            return json.dumps({"answer": expert_answer})
+
+        except APIError as err:
+            _LOGGER.error("Expert model API error: %s", err)
+            return json.dumps({"error": f"Expert model error: {err}"})
+        except Exception:
+            _LOGGER.exception("Unexpected error calling expert model")
+            return json.dumps({"error": "Failed to reach expert model"})

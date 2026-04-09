@@ -35,10 +35,12 @@
         "title": "Select Model",
         "description": "GitHub authentication successful! Choose which AI model to use.",
         "data": {
-          "model": "Model"
+          "model": "Model (fast/orchestrator)",
+          "expert_model": "Expert Model (optional)"
         },
         "data_description": {
-          "model": "Select a model or type a custom model ID (format: publisher/model-name)"
+          "model": "The fast model used for all requests. Select the fastest model available for orchestration.",
+          "expert_model": "A powerful model for complex reasoning. The fast model will escalate hard questions here. Leave empty to disable."
         }
       },
       "github_pat": {
@@ -46,11 +48,13 @@
         "description": "Enter a GitHub Personal Access Token with `models:read` permission.\n\n[Create a fine-grained PAT](https://github.com/settings/personal-access-tokens/new)",
         "data": {
           "github_token": "GitHub Token (PAT)",
-          "model": "Model"
+          "model": "Model (fast/orchestrator)",
+          "expert_model": "Expert Model (optional)"
         },
         "data_description": {
           "github_token": "A fine-grained PAT with `models:read` scope",
-          "model": "Select a model or type a custom model ID (format: publisher/model-name)"
+          "model": "The fast model used for all requests. Select the fastest model available for orchestration.",
+          "expert_model": "A powerful model for complex reasoning. The fast model will escalate hard questions here. Leave empty to disable."
         }
       },
       "azure": {
@@ -86,7 +90,8 @@
         "description": "Update your API credentials or model selection.",
         "data": {
           "github_token": "GitHub Token (PAT)",
-          "model": "Model",
+          "model": "Model (fast/orchestrator)",
+          "expert_model": "Expert Model (optional)",
           "azure_endpoint": "Endpoint URL",
           "azure_api_key": "API Key"
         }
@@ -102,6 +107,7 @@
           "data": {
             "title": "Name",
             "llm_hass_api": "Home Assistant APIs",
+            "expert_model": "Expert Model Override (optional)",
             "prompt": "System Prompt",
             "temperature": "Temperature",
             "max_tokens": "Max Tokens"
@@ -109,6 +115,7 @@
           "data_description": {
             "title": "Display name for this conversation agent",
             "llm_hass_api": "Which HA APIs should this agent have access to (e.g., Assist for entity control)",
+            "expert_model": "Override the expert model for this agent. Leave empty to use the integration-level expert model.",
             "prompt": "Custom system prompt to override the default. Leave empty for the default prompt.",
             "temperature": "Controls randomness (0 = deterministic, 1 = creative)",
             "max_tokens": "Maximum number of tokens in the response"

@@ -7,6 +7,7 @@ CONF_GITHUB_TOKEN = "github_token"
 CONF_AZURE_ENDPOINT = "azure_endpoint"
 CONF_AZURE_API_KEY = "azure_api_key"
 CONF_MODEL = "model"
+CONF_EXPERT_MODEL = "expert_model"
 CONF_PROMPT = "prompt"
 CONF_TEMPERATURE = "temperature"
 CONF_MAX_TOKENS = "max_tokens"
@@ -34,16 +35,18 @@ GITHUB_MODELS_URL = "https://models.github.ai/inference/chat/completions"
 GITHUB_CATALOG_URL = "https://models.github.ai/catalog/models"
 GITHUB_API_VERSION = "2026-03-10"
 
-DEFAULT_MODEL = "openai/gpt-4.1-mini"
+DEFAULT_MODEL = "openai/gpt-5-nano"
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_MAX_TOKENS = 4096
 
 # Fallback models when catalog API is unavailable
 FALLBACK_MODELS = [
-    "openai/gpt-4.1",
-    "openai/gpt-4.1-mini",
+    "openai/gpt-5-nano",
+    "openai/gpt-5-mini",
+    "openai/gpt-5",
     "openai/gpt-4.1-nano",
-    "openai/gpt-4o",
+    "openai/gpt-4.1-mini",
+    "openai/gpt-4.1",
 ]
 
 DEFAULT_PROMPT = (
@@ -54,6 +57,26 @@ DEFAULT_PROMPT = (
     "When you control a device, briefly confirm what you did. "
     "When reporting sensor values, include units. "
     "If a request is ambiguous, ask for clarification."
+)
+
+# Orchestrator / expert escalation
+EXPERT_TOOL_NAME = "ask_expert"
+KNOWLEDGE_TOOL_NAME = "search_knowledge"
+KNOWLEDGE_STORE_KEY = "ghcp_conversation.knowledge"
+KNOWLEDGE_MAX_ENTRIES = 200
+
+ORCHESTRATOR_PROMPT_SUFFIX = (
+    "\n\n## Orchestrator Mode\n"
+    "You have two special tools: `search_knowledge` and `ask_expert`.\n"
+    "- For simple tasks (device control, status queries, quick answers), "
+    "handle them yourself — do NOT use these tools.\n"
+    "- For complex questions that require deep reasoning, planning, analysis, "
+    "or when the user says 'think harder', 'use expert', or 'be thorough':\n"
+    "  1. FIRST call `search_knowledge` to check if a similar question was "
+    "answered before.\n"
+    "  2. If a relevant match is found, use that answer directly.\n"
+    "  3. Only call `ask_expert` if no relevant knowledge was found.\n"
+    "- Present all answers naturally without mentioning tools or escalation."
 )
 
 CONF_SUBENTRY_TITLE = "title"

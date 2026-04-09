@@ -48,6 +48,7 @@ from .const import (
     CONF_AZURE_API_KEY,
     CONF_AZURE_ENDPOINT,
     CONF_BACKEND,
+    CONF_EXPERT_MODEL,
     CONF_GITHUB_TOKEN,
     CONF_MAX_TOKENS,
     CONF_MODEL,
@@ -360,6 +361,9 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "unknown"
             else:
                 self._data[CONF_MODEL] = model
+                expert = user_input.get(CONF_EXPERT_MODEL, "")
+                if expert:
+                    self._data[CONF_EXPERT_MODEL] = expert
                 return self.async_create_entry(
                     title="GitHub Copilot Conversation",
                     data=self._data,
@@ -374,6 +378,14 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_MODEL, default=DEFAULT_MODEL): SelectSelector(
                         SelectSelectorConfig(
                             options=model_options,
+                            custom_value=True,
+                            mode=SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+                    vol.Optional(CONF_EXPERT_MODEL, default=""): SelectSelector(
+                        SelectSelectorConfig(
+                            options=[{"value": "", "label": "None (disabled)"}]
+                            + model_options,
                             custom_value=True,
                             mode=SelectSelectorMode.DROPDOWN,
                         )
@@ -408,6 +420,9 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 self._data[CONF_GITHUB_TOKEN] = token
                 self._data[CONF_MODEL] = model
+                expert = user_input.get(CONF_EXPERT_MODEL, "")
+                if expert:
+                    self._data[CONF_EXPERT_MODEL] = expert
                 return self.async_create_entry(
                     title="GitHub Copilot Conversation",
                     data=self._data,
@@ -429,6 +444,14 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_MODEL, default=DEFAULT_MODEL): SelectSelector(
                         SelectSelectorConfig(
                             options=model_options,
+                            custom_value=True,
+                            mode=SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+                    vol.Optional(CONF_EXPERT_MODEL, default=""): SelectSelector(
+                        SelectSelectorConfig(
+                            options=[{"value": "", "label": "None (disabled)"}]
+                            + model_options,
                             custom_value=True,
                             mode=SelectSelectorMode.DROPDOWN,
                         )
@@ -548,6 +571,19 @@ class GHCPOptionsFlow(OptionsFlow):
                     mode=SelectSelectorMode.DROPDOWN,
                 )
             )
+            schema_dict[
+                vol.Optional(
+                    CONF_EXPERT_MODEL,
+                    default=entry_data.get(CONF_EXPERT_MODEL, ""),
+                )
+            ] = SelectSelector(
+                SelectSelectorConfig(
+                    options=[{"value": "", "label": "None (disabled)"}]
+                    + model_options,
+                    custom_value=True,
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            )
         else:
             schema_dict[
                 vol.Required(
@@ -603,6 +639,9 @@ class GHCPConversationSubentryFlow:
                             multiple=True,
                             mode=SelectSelectorMode.DROPDOWN,
                         )
+                    ),
+                    vol.Optional(CONF_EXPERT_MODEL, default=""): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.TEXT)
                     ),
                     vol.Optional(CONF_PROMPT): TemplateSelector(),
                     vol.Optional(
