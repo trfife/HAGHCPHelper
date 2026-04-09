@@ -1,5 +1,36 @@
 # Changelog
 
+## 3.0.0
+
+### Hybrid Routing Engine
+- **Azure AI Foundry fast-routing** — simple queries (device control, state checks) are handled locally or via a fast Azure model in < 1s; complex tasks route to Copilot CLI expert
+- **Deterministic intent classifier** — regex-based pattern matching for instant local routing of common commands (turn on/off, state queries, set values) with zero API calls
+- **Configurable hybrid backend** — new "Hybrid — Azure fast + CLI expert" option combines fast Azure inference with Copilot CLI expert fallback; select during integration setup
+- **Graceful fallback chain** — if Azure is unavailable or fails, automatically falls through to Copilot CLI; if no Azure configured, uses direct API
+
+### Analytics & Learning
+- **Request analytics database** — every conversation logs route taken, latency (ms), tokens in/out, success/failure to a SQLite database for performance analysis
+- **Knowledge store upgrade** — migrated from JSON to SQLite with hit-count tracking; every knowledge search bumps hit_count on matched entries
+- **Promotion candidate detection** — knowledge entries with high hit counts are flagged as candidates for future fast-engine rule promotion via `async_get_promotion_candidates()`
+- **Legacy migration** — existing JSON knowledge store entries automatically imported into SQLite on first load
+
+### Copilot CLI Enhancements
+- **Memory MCP server** — persistent knowledge graph (`@modelcontextprotocol/server-memory`) across CLI sessions, stored at `/data/copilot-persist/memory/`
+- **Git config tracking** — automatic `git init` + `.gitignore` on `/homeassistant`; takes config snapshots on every add-on startup for change tracking and rollback
+- **Path-specific instructions** — targeted Copilot instructions for automation editing (`automations.instructions.md`) and debugging workflows (`debugging.instructions.md`) with `applyTo` globs
+- **AGENTS.md agent modes** — four specialized modes: Device Controller, Config Editor, Automation Builder, and Diagnostics Expert
+- Node.js/npm added to container for MCP server support
+
+### Infrastructure
+- New `router.py` — intent classification and routing engine with LOCAL/AZURE/CLI routes
+- New `analytics.py` — SQLite-based request logging, statistics, knowledge storage with hit tracking
+- Updated `entity.py` — `_async_handle_hybrid()` orchestrator, `_async_handle_azure_fast()` for Azure AI Foundry
+- Updated `const.py` — `BACKEND_HYBRID`, Azure router config constants
+- Updated `config_flow.py` — new hybrid backend setup step with Azure + ACP validation
+- Updated `manifest.json` — `aiosqlite>=0.20.0` dependency
+- Updated `Dockerfile` — Node.js, npm, `@modelcontextprotocol/server-memory`
+- Updated `ttyd/run` — Memory MCP, git tracking, path instructions, AGENTS.md generation
+
 ## 2.2.0
 
 - **Fix: ACP server now respects model config** — the `model` option from add-on settings is now passed to `copilot --acp --model <model>`, matching the ttyd terminal behavior

@@ -21,7 +21,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
     ripgrep \
     procps \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
+
+# Pre-install Memory MCP server globally (persistent knowledge graph)
+RUN npm install -g @modelcontextprotocol/server-memory 2>/dev/null || true
 
 # Install GitHub Copilot CLI (standalone binary — no Node.js needed)
 ARG BUILD_ARCH

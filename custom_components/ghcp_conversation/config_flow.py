@@ -42,11 +42,15 @@ from .const import (
     BACKEND_AZURE,
     BACKEND_COPILOT_CLI,
     BACKEND_GITHUB,
+    BACKEND_HYBRID,
     CONF_ACP_HOST,
     CONF_ACP_PORT,
     CONF_AUTH_METHOD,
     CONF_AZURE_API_KEY,
     CONF_AZURE_ENDPOINT,
+    CONF_AZURE_ROUTER_ENDPOINT,
+    CONF_AZURE_ROUTER_KEY,
+    CONF_AZURE_ROUTER_MODEL,
     CONF_BACKEND,
     CONF_EXPERT_MODEL,
     CONF_GITHUB_TOKEN,
@@ -54,6 +58,7 @@ from .const import (
     CONF_MODEL,
     CONF_PROMPT,
     CONF_TEMPERATURE,
+    DEFAULT_AZURE_ROUTER_MODEL,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
     DEFAULT_PROMPT,
@@ -73,7 +78,8 @@ from .github_auth import (
 _LOGGER = logging.getLogger(__name__)
 
 BACKEND_OPTIONS = [
-    {"value": BACKEND_COPILOT_CLI, "label": "Copilot CLI Add-on (recommended)"},
+    {"value": BACKEND_HYBRID, "label": "Hybrid — Azure fast + CLI expert (recommended)"},
+    {"value": BACKEND_COPILOT_CLI, "label": "Copilot CLI Add-on only"},
     {"value": BACKEND_GITHUB, "label": "GitHub Models (direct API)"},
     {"value": BACKEND_AZURE, "label": "Azure AI Endpoint"},
 ]
@@ -120,6 +126,8 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle backend selection step."""
         if user_input is not None:
             self._data[CONF_BACKEND] = user_input[CONF_BACKEND]
+            if self._data[CONF_BACKEND] == BACKEND_HYBRID:
+                return await self.async_step_hybrid()
             if self._data[CONF_BACKEND] == BACKEND_COPILOT_CLI:
                 return await self.async_step_copilot_cli()
             if self._data[CONF_BACKEND] == BACKEND_GITHUB:
@@ -127,7 +135,7 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
             return await self.async_step_azure()
 
         # Auto-detect the add-on to pick the best default
-        default_backend = BACKEND_COPILOT_CLI
+        default_backend = BACKEND_HYBRID
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
@@ -187,6 +195,97 @@ class GHCPConversationConfigFlow(ConfigFlow, domain=DOMAIN):
                         NumberSelectorConfig(
                             min=1, max=65535, mode=NumberSelectorMode.BOX
                         )
+                    ),
+                }
+            ),
+            errors=errors,
+        )
+
+    async def async_step_hybrid(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Configure Hybrid backend — Azure fast router + CLI expert fallback."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            # Validate ACP connection first
+            host = user_input.get(CONF_ACP_HOST, "localhost")
+            port = int(user_input.get(CONF_ACP_PORT, ACP_DEFAULT_PORT))
+
+            client = ACPClient(host, port)
+            try:
+                ok = await client.async_validate(timeout=10)
+                if not ok:
+                    errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.warning("ACP validation failed for hybrid setup")
+                errors["base"] = "cannot_connect"
+            finally:
+                await client.async_close()
+
+            # Validate Azure endpoint if provided
+            azure_endpoint = user_input.get(CONF_AZURE_ROUTER_ENDPOINT, "")
+            azure_key = user_input.get(CONF_AZURE_ROUTER_KEY, "")
+            if azure_endpoint and azure_key and not errors:
+                router_model = user_input.get(
+                    CONF_AZURE_ROUTER_MODEL, DEFAULT_AZURE_ROUTER_MODEL
+                )
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        az_client = build_azure_client(
+                            session, azure_endpoint, azure_key
+                        )
+                        await az_client.async_validate(router_model)
+                except APIError as err:
+                    _LOGGER.error("Azure router validation failed: %s", err)
+                    if err.status in (401, 403):
+                        errors["base"] = "invalid_auth"
+                    else:
+                        errors[CONF_AZURE_ROUTER_ENDPOINT] = "cannot_connect"
+                except Exception:
+                    errors[CONF_AZURE_ROUTER_ENDPOINT] = "cannot_connect"
+
+            if not errors:
+                self._data[CONF_ACP_HOST] = host
+                self._data[CONF_ACP_PORT] = port
+                if azure_endpoint:
+                    self._data[CONF_AZURE_ROUTER_ENDPOINT] = azure_endpoint
+                    self._data[CONF_AZURE_ROUTER_KEY] = azure_key
+                    self._data[CONF_AZURE_ROUTER_MODEL] = user_input.get(
+                        CONF_AZURE_ROUTER_MODEL, DEFAULT_AZURE_ROUTER_MODEL
+                    )
+                return self.async_create_entry(
+                    title="GitHub Copilot Hybrid",
+                    data=self._data,
+                )
+
+        default_host = await self._async_discover_addon_host()
+
+        return self.async_show_form(
+            step_id="hybrid",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_ACP_HOST, default=default_host
+                    ): TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT)),
+                    vol.Required(
+                        CONF_ACP_PORT, default=ACP_DEFAULT_PORT
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=1, max=65535, mode=NumberSelectorMode.BOX
+                        )
+                    ),
+                    vol.Optional(CONF_AZURE_ROUTER_ENDPOINT): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.URL)
+                    ),
+                    vol.Optional(CONF_AZURE_ROUTER_KEY): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.PASSWORD)
+                    ),
+                    vol.Optional(
+                        CONF_AZURE_ROUTER_MODEL,
+                        default=DEFAULT_AZURE_ROUTER_MODEL,
+                    ): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.TEXT)
                     ),
                 }
             ),
