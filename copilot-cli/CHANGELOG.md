@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.0.3
+
+- **Fix: graceful fallback when aiosqlite not installed** — analytics import failure no longer crashes the entire integration; analytics is skipped and a warning is logged
+- All `metrics` references guarded with `if metrics` checks
+- Added debug logging to Azure fast handler and URL builder for diagnostics
+- Integration will now load and work even if aiosqlite pip install hasn't completed yet
+
 ## 3.0.2
 
 - **Fix: Hybrid routing now works for all 3 tiers** — LOCAL and AZURE routes now correctly use the Azure router credentials instead of trying to use missing GitHub token

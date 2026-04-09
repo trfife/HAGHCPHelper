@@ -149,6 +149,8 @@ def build_azure_client(
         # Bare base URL, no model — append generic chat/completions
         url = f"{url}/chat/completions"
 
+    _LOGGER.debug("Azure client URL: %s", url)
+
     return ChatCompletionClient(
         session, base_url=url, api_key=api_key, is_github=False
     )

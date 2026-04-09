@@ -8,9 +8,13 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
-from .analytics import AnalyticsStore
 from .const import DOMAIN
 from .knowledge import KnowledgeStore
+
+try:
+    from .analytics import AnalyticsStore
+except ImportError:
+    AnalyticsStore = None  # type: ignore[assignment,misc]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,16 +28,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         knowledge = KnowledgeStore(hass)
         await knowledge.async_load()
 
-        analytics = AnalyticsStore(hass)
-        await analytics.async_setup()
+        analytics = None
+        if AnalyticsStore is not None:
+            try:
+                analytics = AnalyticsStore(hass)
+                await analytics.async_setup()
 
-        # Migrate legacy JSON knowledge → SQLite on first load
-        if knowledge.entry_count > 0:
-            migrated = await analytics.async_migrate_from_json(
-                knowledge._entries  # noqa: SLF001
+                # Migrate legacy JSON knowledge → SQLite on first load
+                if knowledge.entry_count > 0:
+                    migrated = await analytics.async_migrate_from_json(
+                        knowledge._entries  # noqa: SLF001
+                    )
+                    if migrated:
+                        _LOGGER.info(
+                            "Migrated %d knowledge entries to SQLite", migrated
+                        )
+            except Exception:
+                _LOGGER.exception("Failed to initialize analytics — continuing without it")
+                analytics = None
+        else:
+            _LOGGER.warning(
+                "aiosqlite not available — analytics disabled. "
+                "Install with: pip install aiosqlite"
             )
-            if migrated:
-                _LOGGER.info("Migrated %d knowledge entries to SQLite", migrated)
 
         hass.data[DOMAIN] = {"knowledge": knowledge, "analytics": analytics}
 

@@ -10,5 +10,5 @@
   "issue_tracker": "https://github.com/trfife/HAGHCPHelper/issues",
   "requirements": ["aiosqlite>=0.20.0"],
   "single_config_entry": true,
-  "version": "3.0.2"
+  "version": "3.0.3"
 }
