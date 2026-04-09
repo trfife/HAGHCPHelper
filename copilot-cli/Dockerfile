@@ -85,6 +85,8 @@ alias c="copilot"
 alias ll="ls -la"
 alias ha-config="cd /homeassistant"
 alias ha-logs="cat /homeassistant/home-assistant.log 2>/dev/null || echo 'Log not found'"
+alias self-edit="cd /data/projects/HAGHCPHelper"
+alias repo="cd /data/projects/HAGHCPHelper"
 EOF
 
 RUN echo 'source ~/.bashrc' > /root/.profile

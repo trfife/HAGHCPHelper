@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.0.7
+
+- **Self-modification: CLI can edit its own repo** — HAGHCPHelper repo auto-cloned to `/data/projects/HAGHCPHelper` on startup using the configured GitHub token
+- Git credentials set up automatically for push access
+- Copilot instructions include full self-modification workflow: repo structure, 5 version locations, branch/commit/push workflow, key rules
+- New aliases: `self-edit` and `repo` to jump to the project directory
+- Persistent across restarts (stored in `/data/projects/`)
+
 ## 3.0.6
 
 - **Fix: `ToolResultContent` attribute** — HA uses `.tool_result` not `.result` in `_build_messages()`. This was the actual cause of Azure route crashes (`'ToolResultContent' object has no attribute 'result'`)

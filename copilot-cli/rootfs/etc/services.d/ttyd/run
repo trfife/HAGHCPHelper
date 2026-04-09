@@ -61,6 +61,42 @@ COPILOT_VERSION=$(copilot --version 2>/dev/null || echo "unknown")
 bashio::log.info "Copilot CLI version: ${COPILOT_VERSION}"
 
 # -------------------------------------------------------
+# Clone/update HAGHCPHelper repo (self-modification)
+# -------------------------------------------------------
+REPO_DIR="/data/projects/HAGHCPHelper"
+REPO_URL="https://github.com/trfife/HAGHCPHelper.git"
+
+if bashio::var.has_value "${GH_TOKEN_OPT}"; then
+    # Configure git with token-based auth
+    git config --global credential.helper store
+    git config --global user.name "Copilot CLI Add-on"
+    git config --global user.email "copilot-cli@homeassistant.local"
+
+    # Store credentials for push access
+    REPO_AUTH_URL="https://${GH_TOKEN_OPT}@github.com"
+    echo "${REPO_AUTH_URL}" > /root/.git-credentials 2>/dev/null
+    chmod 600 /root/.git-credentials 2>/dev/null
+
+    if [ -d "${REPO_DIR}/.git" ]; then
+        bashio::log.info "Updating HAGHCPHelper repo..."
+        cd "${REPO_DIR}" || true
+        git fetch origin 2>/dev/null
+        git pull --ff-only origin main 2>/dev/null || \
+            bashio::log.warning "Git pull failed (local changes?) — repo still usable"
+    else
+        bashio::log.info "Cloning HAGHCPHelper repo..."
+        git clone "${REPO_URL}" "${REPO_DIR}" 2>/dev/null || \
+            bashio::log.warning "Git clone failed — check GitHub token permissions"
+    fi
+
+    if [ -d "${REPO_DIR}/.git" ]; then
+        bashio::log.info "HAGHCPHelper repo ready at ${REPO_DIR}"
+    fi
+else
+    bashio::log.info "No GitHub token — skipping repo clone (self-modification disabled)"
+fi
+
+# -------------------------------------------------------
 # Update tmux scrollback from options
 # -------------------------------------------------------
 sed -i "s/history-limit.*/history-limit ${TMUX_HISTORY}/" /root/.tmux.conf
@@ -462,6 +498,47 @@ curl -sf -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
 - NEVER display API tokens, passwords, or the SUPERVISOR_TOKEN.
 - When creating automations that control security devices (locks, alarms, garage
   doors), always warn the user about safety implications.
+
+## Self-Modification — HAGHCPHelper Repo
+
+You have access to your own source code at `/data/projects/HAGHCPHelper`.
+This is a git clone of the GitHub repo that builds this add-on and the
+`ghcp_conversation` HA integration. You can modify your own code!
+
+### Repo Structure
+| Directory | Purpose |
+|-----------|---------|
+| `custom_components/ghcp_conversation/` | HA custom integration (conversation entity) |
+| `copilot-cli/` | This add-on (Dockerfile, s6 services, config) |
+| `copilot-cli/ghcp_conversation/` | Synced copy of the integration bundled in add-on |
+| `research/` | Architecture research docs |
+| `.github/instructions/` | Copilot instruction files |
+
+### Version Locations (5 places — ALL must match)
+1. `custom_components/ghcp_conversation/manifest.json` → `"version"`
+2. `copilot-cli/ghcp_conversation/manifest.json` → `"version"` (synced copy)
+3. `copilot-cli/config.yaml` → `version`
+4. `custom_components/ghcp_conversation/acp_client.py` → `CLIENT_VERSION`
+5. `copilot-cli/ghcp_conversation/acp_client.py` → `CLIENT_VERSION` (synced copy)
+
+### Workflow for Self-Modification
+1. `cd /data/projects/HAGHCPHelper`
+2. Create a branch: `git checkout -b feature/description`
+3. Make changes to `custom_components/ghcp_conversation/` (source of truth)
+4. Sync to add-on copy: `cp -r custom_components/ghcp_conversation/* copilot-cli/ghcp_conversation/`
+5. Bump version in all 5 locations
+6. Update `copilot-cli/CHANGELOG.md`
+7. Commit: `git add -A && git commit -m "type: description"`
+8. Push: `git push origin feature/description`
+9. Tell the user to merge the PR and update the add-on
+
+### Key Rules
+- Always work in `custom_components/` first, then sync to `copilot-cli/ghcp_conversation/`
+- Update ALL 5 version locations on every version bump
+- `llm.APIInstance` uses `.api_prompt` (NOT `.prompt`)
+- Use `data.get(KEY, default)` — never `data[KEY]` for optional config
+- Guard `aiosqlite` imports with try/except ImportError
+- HA `ToolResultContent` uses `.tool_result` (NOT `.result`)
 INSTREOF
 
 # Append Node-RED section if configured
