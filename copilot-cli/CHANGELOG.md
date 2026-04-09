@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.4
+
+- **Fix: `'APIInstance' object has no attribute 'prompt'`** — HA's `llm.APIInstance` uses `api_prompt` not `prompt`. Fixed in all 3 occurrences (Azure fast handler, direct API handler, expert escalation handler). This was the cause of Azure route failures falling back to CLI.
+
 ## 3.0.3
 
 - **Fix: graceful fallback when aiosqlite not installed** — analytics import failure no longer crashes the entire integration; analytics is skipped and a warning is logged

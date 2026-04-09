@@ -1,0 +1,500 @@
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 465, in async_render
+    render_result = render_with_context(self.template, compiled, **kwargs)
+  File "/usr/src/homeassistant/homeassistant/helpers/template/context.py", line 45, in render_with_context
+    return template.render(**kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "<template>", line 1, in top-level template code
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 1636, in forgiving_int_filter
+    raise_no_default("int", value)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/helpers.py", line 24, in raise_no_default
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.elizabeth_phone_battery_level') | int }}%' but no default was specified
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 583, in async_render_to_info
+    render_info._result = self.async_render(  # noqa: SLF001
+                          ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+        variables, strict=strict, log_fn=log_fn, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 467, in async_render
+    raise TemplateError(err) from err
+homeassistant.exceptions.TemplateError: ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.elizabeth_phone_battery_level') | int }}%' but no default was specified[0m
+[31m2026-04-09 10:03:24.134 ERROR (MainThread) [homeassistant.helpers.event] Error while processing template: Template<template=({{ states('sensor.penelope_phone_battery_level') | int }}%) renders=2>
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 465, in async_render
+    render_result = render_with_context(self.template, compiled, **kwargs)
+  File "/usr/src/homeassistant/homeassistant/helpers/template/context.py", line 45, in render_with_context
+    return template.render(**kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "<template>", line 1, in top-level template code
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 1636, in forgiving_int_filter
+    raise_no_default("int", value)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/helpers.py", line 24, in raise_no_default
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.penelope_phone_battery_level') | int }}%' but no default was specified
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 583, in async_render_to_info
+    render_info._result = self.async_render(  # noqa: SLF001
+                          ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+        variables, strict=strict, log_fn=log_fn, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 467, in async_render
+    raise TemplateError(err) from err
+homeassistant.exceptions.TemplateError: ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.penelope_phone_battery_level') | int }}%' but no default was specified[0m
+[31m2026-04-09 10:03:24.136 ERROR (MainThread) [homeassistant.helpers.event] Error while processing template: Template<template=({{ states('sensor.xander_phone_battery_level') | int }}%) renders=2>
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 465, in async_render
+    render_result = render_with_context(self.template, compiled, **kwargs)
+  File "/usr/src/homeassistant/homeassistant/helpers/template/context.py", line 45, in render_with_context
+    return template.render(**kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "<template>", line 1, in top-level template code
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 1636, in forgiving_int_filter
+    raise_no_default("int", value)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/helpers.py", line 24, in raise_no_default
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.xander_phone_battery_level') | int }}%' but no default was specified
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 583, in async_render_to_info
+    render_info._result = self.async_render(  # noqa: SLF001
+                          ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+        variables, strict=strict, log_fn=log_fn, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 467, in async_render
+    raise TemplateError(err) from err
+homeassistant.exceptions.TemplateError: ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.xander_phone_battery_level') | int }}%' but no default was specified[0m
+[31m2026-04-09 10:03:24.139 ERROR (MainThread) [homeassistant.helpers.event] Error while processing template: Template<template=({{ states('sensor.zachary_phone_battery_level') | int }}%) renders=2>
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 465, in async_render
+    render_result = render_with_context(self.template, compiled, **kwargs)
+  File "/usr/src/homeassistant/homeassistant/helpers/template/context.py", line 45, in render_with_context
+    return template.render(**kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "<template>", line 1, in top-level template code
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 1636, in forgiving_int_filter
+    raise_no_default("int", value)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/helpers.py", line 24, in raise_no_default
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.zachary_phone_battery_level') | int }}%' but no default was specified
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 583, in async_render_to_info
+    render_info._result = self.async_render(  # noqa: SLF001
+                          ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+        variables, strict=strict, log_fn=log_fn, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 467, in async_render
+    raise TemplateError(err) from err
+homeassistant.exceptions.TemplateError: ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.zachary_phone_battery_level') | int }}%' but no default was specified[0m
+[31m2026-04-09 10:03:24.141 ERROR (MainThread) [homeassistant.helpers.event] Error while processing template: Template<template=({{ states('sensor.viola_phone_battery_level') | int }}%) renders=2>
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 465, in async_render
+    render_result = render_with_context(self.template, compiled, **kwargs)
+  File "/usr/src/homeassistant/homeassistant/helpers/template/context.py", line 45, in render_with_context
+    return template.render(**kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "<template>", line 1, in top-level template code
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 1636, in forgiving_int_filter
+    raise_no_default("int", value)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/helpers.py", line 24, in raise_no_default
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.viola_phone_battery_level') | int }}%' but no default was specified
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 583, in async_render_to_info
+    render_info._result = self.async_render(  # noqa: SLF001
+                          ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+        variables, strict=strict, log_fn=log_fn, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 467, in async_render
+    raise TemplateError(err) from err
+homeassistant.exceptions.TemplateError: ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.viola_phone_battery_level') | int }}%' but no default was specified[0m
+[31m2026-04-09 10:03:24.411 ERROR (MainThread) [homeassistant.helpers.event] Error while processing template: Template<template=({{ states('sensor.thomphone_battery_level') | int }}%) renders=6>
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 465, in async_render
+    render_result = render_with_context(self.template, compiled, **kwargs)
+  File "/usr/src/homeassistant/homeassistant/helpers/template/context.py", line 45, in render_with_context
+    return template.render(**kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "<template>", line 1, in top-level template code
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 1636, in forgiving_int_filter
+    raise_no_default("int", value)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/helpers.py", line 24, in raise_no_default
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.thomphone_battery_level') | int }}%' but no default was specified
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 583, in async_render_to_info
+    render_info._result = self.async_render(  # noqa: SLF001
+                          ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+        variables, strict=strict, log_fn=log_fn, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 467, in async_render
+    raise TemplateError(err) from err
+homeassistant.exceptions.TemplateError: ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.thomphone_battery_level') | int }}%' but no default was specified[0m
+[31m2026-04-09 10:03:24.412 ERROR (MainThread) [homeassistant.helpers.event] Error while processing template: Template<template=({{ states('sensor.elizabeth_phone_battery_level') | int }}%) renders=6>
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 465, in async_render
+    render_result = render_with_context(self.template, compiled, **kwargs)
+  File "/usr/src/homeassistant/homeassistant/helpers/template/context.py", line 45, in render_with_context
+    return template.render(**kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "<template>", line 1, in top-level template code
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 1636, in forgiving_int_filter
+    raise_no_default("int", value)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/helpers.py", line 24, in raise_no_default
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.elizabeth_phone_battery_level') | int }}%' but no default was specified
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 583, in async_render_to_info
+    render_info._result = self.async_render(  # noqa: SLF001
+                          ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+        variables, strict=strict, log_fn=log_fn, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 467, in async_render
+    raise TemplateError(err) from err
+homeassistant.exceptions.TemplateError: ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.elizabeth_phone_battery_level') | int }}%' but no default was specified[0m
+[31m2026-04-09 10:03:24.416 ERROR (MainThread) [homeassistant.helpers.event] Error while processing template: Template<template=({{ states('sensor.penelope_phone_battery_level') | int }}%) renders=6>
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 465, in async_render
+    render_result = render_with_context(self.template, compiled, **kwargs)
+  File "/usr/src/homeassistant/homeassistant/helpers/template/context.py", line 45, in render_with_context
+    return template.render(**kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "<template>", line 1, in top-level template code
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 1636, in forgiving_int_filter
+    raise_no_default("int", value)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/helpers.py", line 24, in raise_no_default
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.penelope_phone_battery_level') | int }}%' but no default was specified
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 583, in async_render_to_info
+    render_info._result = self.async_render(  # noqa: SLF001
+                          ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+        variables, strict=strict, log_fn=log_fn, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 467, in async_render
+    raise TemplateError(err) from err
+homeassistant.exceptions.TemplateError: ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.penelope_phone_battery_level') | int }}%' but no default was specified[0m
+[31m2026-04-09 10:03:24.418 ERROR (MainThread) [homeassistant.helpers.event] Error while processing template: Template<template=({{ states('sensor.xander_phone_battery_level') | int }}%) renders=6>
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 465, in async_render
+    render_result = render_with_context(self.template, compiled, **kwargs)
+  File "/usr/src/homeassistant/homeassistant/helpers/template/context.py", line 45, in render_with_context
+    return template.render(**kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "<template>", line 1, in top-level template code
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 1636, in forgiving_int_filter
+    raise_no_default("int", value)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/helpers.py", line 24, in raise_no_default
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.xander_phone_battery_level') | int }}%' but no default was specified
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 583, in async_render_to_info
+    render_info._result = self.async_render(  # noqa: SLF001
+                          ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+        variables, strict=strict, log_fn=log_fn, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 467, in async_render
+    raise TemplateError(err) from err
+homeassistant.exceptions.TemplateError: ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.xander_phone_battery_level') | int }}%' but no default was specified[0m
+[31m2026-04-09 10:03:24.419 ERROR (MainThread) [homeassistant.helpers.event] Error while processing template: Template<template=({{ states('sensor.zachary_phone_battery_level') | int }}%) renders=6>
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 465, in async_render
+    render_result = render_with_context(self.template, compiled, **kwargs)
+  File "/usr/src/homeassistant/homeassistant/helpers/template/context.py", line 45, in render_with_context
+    return template.render(**kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "<template>", line 1, in top-level template code
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 1636, in forgiving_int_filter
+    raise_no_default("int", value)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/helpers.py", line 24, in raise_no_default
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.zachary_phone_battery_level') | int }}%' but no default was specified
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 583, in async_render_to_info
+    render_info._result = self.async_render(  # noqa: SLF001
+                          ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+        variables, strict=strict, log_fn=log_fn, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 467, in async_render
+    raise TemplateError(err) from err
+homeassistant.exceptions.TemplateError: ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.zachary_phone_battery_level') | int }}%' but no default was specified[0m
+[31m2026-04-09 10:03:24.422 ERROR (MainThread) [homeassistant.helpers.event] Error while processing template: Template<template=({{ states('sensor.viola_phone_battery_level') | int }}%) renders=6>
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 465, in async_render
+    render_result = render_with_context(self.template, compiled, **kwargs)
+  File "/usr/src/homeassistant/homeassistant/helpers/template/context.py", line 45, in render_with_context
+    return template.render(**kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 1295, in render
+    self.environment.handle_exception()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/usr/local/lib/python3.14/site-packages/jinja2/environment.py", line 942, in handle_exception
+    raise rewrite_traceback_stack(source=source)
+  File "<template>", line 1, in top-level template code
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 1636, in forgiving_int_filter
+    raise_no_default("int", value)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/helpers.py", line 24, in raise_no_default
+    raise ValueError(
+    ...<2 lines>...
+    )
+ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.viola_phone_battery_level') | int }}%' but no default was specified
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 583, in async_render_to_info
+    render_info._result = self.async_render(  # noqa: SLF001
+                          ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+        variables, strict=strict, log_fn=log_fn, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/src/homeassistant/homeassistant/helpers/template/__init__.py", line 467, in async_render
+    raise TemplateError(err) from err
+homeassistant.exceptions.TemplateError: ValueError: Template error: int got invalid input 'unknown' when rendering template '{{ states('sensor.viola_phone_battery_level') | int }}%' but no default was specified[0m
+[33m2026-04-09 10:03:25.206 WARNING (ImportExecutor_0) [py.warnings] /usr/local/lib/python3.14/site-packages/elevenlabs/core/pydantic_utilities.py:13: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
+  from pydantic.v1.datetime_parse import parse_date as parse_date
+[0m
+[31m2026-04-09 10:03:29.991 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[31m2026-04-09 10:03:42.818 ERROR (MainThread) [homeassistant.core] Error running job: <Job listen homeassistant_start HassJobType.Callback <function _async_setup_entity_restore.<locals>._write_unavailable_states at 0x7f439e6cb740>>
+Traceback (most recent call last):
+  File "/usr/src/homeassistant/homeassistant/core.py", line 1540, in async_fire_internal
+    self._hass.async_run_hass_job(job, event)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/core.py", line 902, in async_run_hass_job
+    hassjob.target(*args)
+    ~~~~~~~~~~~~~~^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/helpers/entity_registry.py", line 2443, in _write_unavailable_states
+    entry.write_unavailable_state(hass)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/src/homeassistant/homeassistant/helpers/entity_registry.py", line 458, in write_unavailable_state
+    hass.states.async_set(self.entity_id, STATE_UNAVAILABLE, attrs)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/core.py", line 2268, in async_set
+    self.async_set_internal(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        entity_id.lower(),
+        ^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+        timestamp or time.time(),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/usr/src/homeassistant/homeassistant/core.py", line 2369, in async_set_internal
+    state = State(
+        entity_id,
+    ...<8 lines>...
+        timestamp,
+    )
+  File "/usr/src/homeassistant/homeassistant/core.py", line 1783, in __init__
+    raise InvalidEntityFormatError(
+    ...<2 lines>...
+    )
+homeassistant.exceptions.InvalidEntityFormatError: Invalid entity id encountered: enhanced_input.enhancedname_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2_2__10. Format should be <domain>.<object_id>[0m
+[33m2026-04-09 10:03:42.986 WARNING (MainThread) [custom_components.hacs] You have 'carleeno/elevenlabs_tts' installed with HACS this repository has been removed from HACS, please consider removing it. Removal reason (Repository is archived)[0m
+[33m2026-04-09 10:03:49.053 WARNING (Recorder) [homeassistant.components.recorder.db_schema] State attributes for sensor.thomphone_active_notification_count exceed maximum size of 16384 bytes. This can cause database performance issues; Attributes will not be stored[0m
+[33m2026-04-09 10:03:49.074 WARNING (Recorder) [homeassistant.components.recorder.db_schema] State attributes for sensor.thomphone_active_notification_count exceed maximum size of 16384 bytes. This can cause database performance issues; Attributes will not be stored[0m
+[31m2026-04-09 10:04:01.986 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[31m2026-04-09 10:04:33.535 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[31m2026-04-09 10:05:04.468 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[33m2026-04-09 10:05:10.390 WARNING (Recorder) [homeassistant.components.sensor.recorder] The unit of sensor.thomphone_active_notification_count (None) cannot be converted to the unit of previously compiled statistics (notifications). Generation of long term statistics will be suppressed unless the unit changes back to notifications or a compatible unit. Go to https://my.home-assistant.io/redirect/developer_statistics to fix this[0m
+[31m2026-04-09 10:05:35.459 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[31m2026-04-09 10:06:06.830 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[31m2026-04-09 10:06:55.069 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[31m2026-04-09 10:07:26.636 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[33m2026-04-09 10:07:38.531 WARNING (Recorder) [homeassistant.components.recorder.db_schema] State attributes for sensor.thomphone_active_notification_count exceed maximum size of 16384 bytes. This can cause database performance issues; Attributes will not be stored[0m
+[31m2026-04-09 10:07:57.528 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[33m2026-04-09 10:08:18.214 WARNING (MainThread) [custom_components.ghcp_conversation.entity] Azure fast model failed, falling back to CLI: 'APIInstance' object has no attribute 'prompt'[0m
+[31m2026-04-09 10:08:28.601 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[31m2026-04-09 10:08:59.679 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[31m2026-04-09 10:09:30.485 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[33m2026-04-09 10:09:55.272 WARNING (MainThread) [custom_components.ghcp_conversation.entity] Azure fast model failed, falling back to CLI: 'APIInstance' object has no attribute 'prompt'[0m
+[31m2026-04-09 10:10:01.511 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[33m2026-04-09 10:10:07.107 WARNING (MainThread) [custom_components.ghcp_conversation.entity] Azure fast model failed, falling back to CLI: 'APIInstance' object has no attribute 'prompt'[0m
+[31m2026-04-09 10:10:32.479 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[31m2026-04-09 10:11:04.355 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[31m2026-04-09 10:11:35.628 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[31m2026-04-09 10:12:06.549 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[33m2026-04-09 10:12:13.593 WARNING (MainThread) [custom_components.ghcp_conversation.entity] Azure fast model failed, falling back to CLI: 'APIInstance' object has no attribute 'prompt'[0m
+[31m2026-04-09 10:12:56.885 ERROR (MainThread) [custom_components.culligan] Unexpected error updating Culligan devices
+Traceback (most recent call last):
+  File "/config/custom_components/culligan/update_coordinator.py", line 111, in _async_update_softener
+    return await softener.async_update()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/culligan/culliganiot_device.py", line 104, in async_update
+    async with await self.culligan_api.async_request('get', self.all_properties_endpoint, params=None) as resp:
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/client.py", line 1521, in __aenter__
+    self._resp: _RetType = await self._coro
+                           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/client.py", line 788, in _request
+    resp = await handler(req)
+           ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/client_middlewares.py", line 36, in single_middleware_handler
+    return await middleware(req, handler)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/src/homeassistant/homeassistant/helpers/aiohttp_client.py", line 72, in _ssrf_redirect_middleware
+    resp = await handler(request)
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/client.py", line 766, in _connect_and_send_request
+    await resp.start(conn)
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/client_reqrep.py", line 539, in start
+    message, payload = await protocol.read()  # type: ignore[union-attr]
+                       ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/aiohttp/streams.py", line 707, in read
+    await self._waiter
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/config/custom_components/culligan/update_coordinator.py", line 224, in _async_update_data
+    return await asyncio.gather(
+           ^^^^^^^^^^^^^^^^^^^^^
+        *(self._async_update_softener(v) for v in online_devices)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/config/custom_components/culligan/update_coordinator.py", line 108, in _async_update_softener
+    async with timeout(API_TIMEOUT):
+               ~~~~~~~^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/async_timeout/__init__.py", line 141, in __aexit__
+    self._do_exit(exc_type)
+    ~~~~~~~~~~~~~^^^^^^^^^^
+  File "/usr/local/lib/python3.14/site-packages/async_timeout/__init__.py", line 228, in _do_exit
+    raise asyncio.TimeoutError
+TimeoutError[0m
+[31m2026-04-09 10:12:56.887 ERROR (MainThread) [custom_components.culligan] Error fetching culligan data: [0m
+[33m2026-04-09 10:13:10.447 WARNING (MainThread) [custom_components.ghcp_conversation.entity] Azure fast model failed, falling back to CLI: 'APIInstance' object has no attribute 'prompt'[0m
+[31m2026-04-09 10:13:28.441 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m
+[31m2026-04-09 10:13:59.482 ERROR (MainThread) [homeassistant.core] State [{'num': 20, 'date': '2025-11-18 01:57:38'}, {'num': 20, 'date': '2025-11-04 01:57:37'}, {'num': 20, 'date': '2025-10-28 01:57:37'}, {'num': 20, 'date': '2025-10-14 01:57:35'}, {'num': 20, 'date': '2025-08-24 01:57:35'}, {'num': 20, 'date': '2025-04-20 01:57:37'}, {'num': 20, 'date': '2025-01-08 01:57:39'}, {'num': 20, 'date': '2024-09-11 01:57:37'}, {'num': 20, 'date': '2024-06-21 17:01:41'}, {'num': 20, 'date': '2024-06-13 04:30:39'}] for sensor.gbx1_0000ac000w018920594_error_flags is longer than 255, falling back to unknown[0m

@@ -348,7 +348,7 @@ class GHCPConversationEntity(ConversationEntity):
             user_input.extra_system_prompt,
         )
         if chat_log.llm_api:
-            system_prompt = chat_log.llm_api.prompt
+            system_prompt = chat_log.llm_api.api_prompt
 
         messages = self._build_messages(system_prompt, chat_log)
         tools = self._build_tools(chat_log)
@@ -432,7 +432,7 @@ class GHCPConversationEntity(ConversationEntity):
         )
         # Use the chat_log's generated prompt if available
         if chat_log.llm_api:
-            system_prompt = chat_log.llm_api.prompt
+            system_prompt = chat_log.llm_api.api_prompt
 
         # Append orchestrator instructions when expert model is configured
         if expert_model:
@@ -704,7 +704,7 @@ class GHCPConversationEntity(ConversationEntity):
         # Build context for the expert: system prompt + conversation history + query
         system_prompt = data.get(CONF_PROMPT, DEFAULT_PROMPT)
         if chat_log.llm_api:
-            system_prompt = chat_log.llm_api.prompt
+            system_prompt = chat_log.llm_api.api_prompt
 
         expert_messages: list[dict[str, Any]] = [
             {"role": "system", "content": system_prompt},
