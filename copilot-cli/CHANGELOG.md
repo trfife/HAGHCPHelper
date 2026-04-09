@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.1
+
+- **Fix: Azure OpenAI endpoint URL construction** — base URLs like `https://barnabeefoundry.cognitiveservices.azure.com` now correctly build the full `/openai/deployments/{model}/chat/completions?api-version=...` path
+- Hybrid config step now passes the model/deployment name to the Azure client builder
+- Distinct error message for Azure connection failures vs CLI connection failures
+
 ## 3.0.0
 
 ### Hybrid Routing Engine
