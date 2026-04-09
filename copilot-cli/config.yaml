@@ -1,6 +1,6 @@
 ---
 name: "GitHub Copilot CLI"
-version: "3.0.5"
+version: "3.0.6"
 slug: copilot_cli
 description: >-
   Run GitHub Copilot's AI coding agent directly in your Home Assistant
@@ -29,7 +29,7 @@ map:
   - media:ro
 options:
   github_token: ""
-  model: "gpt-5-mini"
+  model: "claude-opus-4.6"
   session_name: "copilot"
   tmux_history_limit: 50000
   auto_approve: false
@@ -44,7 +44,7 @@ options:
   enable_conversation_agent: true
 schema:
   github_token: "password?"
-  model: "list(default|gpt-5-mini|gpt-4.1|gpt-5.4-mini|claude-haiku-4.5|gpt-5.1|gpt-5.2|gpt-5.4|gpt-5.2-codex|gpt-5.3-codex|claude-sonnet-4|claude-sonnet-4.5|claude-sonnet-4.6|claude-opus-4.5|claude-opus-4.6)"
+  model: "list(default|claude-opus-4.6|claude-sonnet-4.6|claude-sonnet-4.5|claude-opus-4.5|gpt-5-mini|gpt-4.1|gpt-5.4-mini|claude-haiku-4.5|gpt-5.1|gpt-5.2|gpt-5.4|gpt-5.2-codex|gpt-5.3-codex|claude-sonnet-4)"
   session_name: "str"
   tmux_history_limit: "int"
   auto_approve: "bool"

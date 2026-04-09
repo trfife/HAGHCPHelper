@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.6
+
+- **Fix: `ToolResultContent` attribute** — HA uses `.tool_result` not `.result` in `_build_messages()`. This was the actual cause of Azure route crashes (`'ToolResultContent' object has no attribute 'result'`)
+- **CLI model default changed to `claude-opus-4.6`** — model dropdown now leads with Opus 4.6 (high quality) instead of gpt-5-mini
+- Model list reordered: Opus/Sonnet models first in dropdown
+
 ## 3.0.5
 
 - **Comprehensive logging at every decision point** — enable debug logging via Settings → Devices & Services → GitHub Copilot Conversation → 3-dot menu → "Enable debug logging" to see:

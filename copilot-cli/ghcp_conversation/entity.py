@@ -569,7 +569,7 @@ class GHCPConversationEntity(ConversationEntity):
                     {
                         "role": "tool",
                         "tool_call_id": entry.tool_call_id,
-                        "content": entry.result,
+                        "content": entry.tool_result,
                     }
                 )
 
