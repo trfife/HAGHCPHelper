@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.0.5
+
+- **Comprehensive logging at every decision point** — enable debug logging via Settings → Devices & Services → GitHub Copilot Conversation → 3-dot menu → "Enable debug logging" to see:
+  - Integration startup: backend type, config keys loaded
+  - Every incoming message: backend, agent name, prompt text
+  - Hybrid router: route decision, matched pattern
+  - ACP handler: host/port, response size, session ID
+  - Azure fast handler: endpoint, model, message count, tool count, iterations, response size
+  - API client: full URL, HTTP status code, model name
+  - Tool calls: which tools called and in what order
+
 ## 3.0.4
 
 - **Fix: `'APIInstance' object has no attribute 'prompt'`** — HA's `llm.APIInstance` uses `api_prompt` not `prompt`. Fixed in all 3 occurrences (Azure fast handler, direct API handler, expert escalation handler). This was the cause of Azure route failures falling back to CLI.

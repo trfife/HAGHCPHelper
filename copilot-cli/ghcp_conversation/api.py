@@ -76,6 +76,14 @@ class ChatCompletionClient:
 
         headers = self._build_headers()
 
+        _LOGGER.debug(
+            "API request: POST %s model=%s msgs=%d tools=%d",
+            self._base_url,
+            model,
+            len(messages),
+            len(tools) if tools else 0,
+        )
+
         try:
             async with self._session.post(
                 self._base_url,
@@ -83,6 +91,7 @@ class ChatCompletionClient:
                 json=payload,
                 timeout=aiohttp.ClientTimeout(total=120),
             ) as resp:
+                _LOGGER.debug("API response: status=%d", resp.status)
                 if resp.status == 401:
                     raise APIError("Authentication failed — check your API key/token", 401)
                 if resp.status == 403:

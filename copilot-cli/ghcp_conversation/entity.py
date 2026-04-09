@@ -161,6 +161,13 @@ class GHCPConversationEntity(ConversationEntity):
         data = self._entry_data
         backend = data.get(CONF_BACKEND, BACKEND_GITHUB)
 
+        _LOGGER.info(
+            "Incoming message: backend=%s agent=%s prompt='%s'",
+            backend,
+            self._attr_name,
+            user_input.text[:100],
+        )
+
         # ACP mode — forward prompt to Copilot CLI
         if backend == BACKEND_COPILOT_CLI:
             return await self._async_handle_acp(user_input, chat_log, data)
@@ -181,6 +188,8 @@ class GHCPConversationEntity(ConversationEntity):
         host = data.get(CONF_ACP_HOST, "localhost")
         port = int(data.get(CONF_ACP_PORT, ACP_DEFAULT_PORT))
 
+        _LOGGER.info("ACP request: host=%s port=%s", host, port)
+
         client = ACPClient(host, port)
         try:
             await client.async_connect()
@@ -194,6 +203,10 @@ class GHCPConversationEntity(ConversationEntity):
             self._acp_session_id = session_id
 
             content = await client.async_prompt(user_input.text)
+            _LOGGER.info(
+                "ACP response: %d chars, session=%s",
+                len(content), self._acp_session_id,
+            )
         except ACPError as err:
             _LOGGER.error("ACP error: %s", err)
             # Reset session on error so next attempt starts fresh
@@ -353,10 +366,18 @@ class GHCPConversationEntity(ConversationEntity):
         messages = self._build_messages(system_prompt, chat_log)
         tools = self._build_tools(chat_log)
 
+        _LOGGER.debug(
+            "Azure fast: %d messages, %d tools, system_prompt=%d chars",
+            len(messages),
+            len(tools) if tools else 0,
+            len(system_prompt),
+        )
+
         async with aiohttp.ClientSession() as session:
             client = build_azure_client(session, endpoint, api_key, model=model)
 
             for _iteration in range(MAX_TOOL_ITERATIONS):
+                _LOGGER.debug("Azure fast: iteration %d", _iteration + 1)
                 response = await client.async_chat_completion(
                     model=model,
                     messages=messages,
@@ -371,7 +392,17 @@ class GHCPConversationEntity(ConversationEntity):
                 tool_calls = message.get("tool_calls")
 
                 if not tool_calls:
+                    _LOGGER.info(
+                        "Azure fast: final response %d chars",
+                        len(content),
+                    )
                     break
+
+                _LOGGER.debug(
+                    "Azure fast: %d tool calls: %s",
+                    len(tool_calls),
+                    [tc.get("function", {}).get("name") for tc in tool_calls],
+                )
 
                 messages.append(message)
                 for tc in tool_calls:

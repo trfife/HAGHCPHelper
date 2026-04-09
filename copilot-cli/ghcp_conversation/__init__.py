@@ -23,6 +23,15 @@ PLATFORMS = [Platform.CONVERSATION]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up GitHub Copilot Conversation from a config entry."""
+    _LOGGER.info(
+        "Setting up ghcp_conversation: backend=%s entry_id=%s",
+        entry.data.get("backend", "unknown"),
+        entry.entry_id,
+    )
+    _LOGGER.debug(
+        "Config data keys: %s", list(entry.data.keys()),
+    )
+
     # Initialize shared stores (once per integration)
     if DOMAIN not in hass.data:
         knowledge = KnowledgeStore(hass)
