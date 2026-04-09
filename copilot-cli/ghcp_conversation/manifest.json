@@ -8,6 +8,7 @@
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/trfife/HAGHCPHelper/issues",
+  "requirements": ["aiosqlite>=0.20.0"],
   "single_config_entry": true,
-  "version": "2.2.0"
+  "version": "3.0.0"
 }

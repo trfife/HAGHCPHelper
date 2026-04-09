@@ -8,6 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
+from .analytics import AnalyticsStore
 from .const import DOMAIN
 from .knowledge import KnowledgeStore
 
@@ -18,11 +19,23 @@ PLATFORMS = [Platform.CONVERSATION]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up GitHub Copilot Conversation from a config entry."""
-    # Initialize shared knowledge store (once per integration)
+    # Initialize shared stores (once per integration)
     if DOMAIN not in hass.data:
-        store = KnowledgeStore(hass)
-        await store.async_load()
-        hass.data[DOMAIN] = {"knowledge": store}
+        knowledge = KnowledgeStore(hass)
+        await knowledge.async_load()
+
+        analytics = AnalyticsStore(hass)
+        await analytics.async_setup()
+
+        # Migrate legacy JSON knowledge → SQLite on first load
+        if knowledge.entry_count > 0:
+            migrated = await analytics.async_migrate_from_json(
+                knowledge._entries  # noqa: SLF001
+            )
+            if migrated:
+                _LOGGER.info("Migrated %d knowledge entries to SQLite", migrated)
+
+        hass.data[DOMAIN] = {"knowledge": knowledge, "analytics": analytics}
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
@@ -40,7 +53,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             if e.entry_id != entry.entry_id
         ]
         if not remaining:
-            hass.data.pop(DOMAIN, None)
+            domain_data = hass.data.pop(DOMAIN, {})
+            analytics = domain_data.get("analytics")
+            if analytics:
+                await analytics.async_close()
 
     return result
 
