@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.0.8
+
+- **Train of thought logging** — every conversation turn now logs a full reasoning trace to the `conversation_trace` SQLite table
+- `TraceLog` captures: route decision (with pattern + confidence), each step with millisecond timestamps, tool calls, model used, response summary, success/failure
+- Queryable via `async_get_traces(limit=20)` for analysis
+- Query traces: `sqlite3 /homeassistant/.storage/ghcp_conversation_analytics.db "SELECT timestamp, route, steps, latency_ms FROM conversation_trace ORDER BY id DESC LIMIT 10"`
+
 ## 3.0.7
 
 - **Self-modification: CLI can edit its own repo** — HAGHCPHelper repo auto-cloned to `/data/projects/HAGHCPHelper` on startup using the configured GitHub token

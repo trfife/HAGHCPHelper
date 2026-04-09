@@ -45,6 +45,33 @@ CREATE TABLE IF NOT EXISTS knowledge (
 )
 """
 
+_CREATE_TRACE_TABLE = """
+CREATE TABLE IF NOT EXISTS conversation_trace (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL,
+    conversation_id TEXT,
+    user_prompt TEXT NOT NULL,
+    route TEXT NOT NULL,
+    route_pattern TEXT,
+    route_confidence REAL,
+    model TEXT,
+    steps TEXT NOT NULL,
+    tool_calls TEXT,
+    response_summary TEXT,
+    latency_ms INTEGER,
+    success INTEGER NOT NULL DEFAULT 1,
+    error_msg TEXT
+)
+"""
+
+_INSERT_TRACE = """
+INSERT INTO conversation_trace
+    (timestamp, conversation_id, user_prompt, route, route_pattern,
+     route_confidence, model, steps, tool_calls, response_summary,
+     latency_ms, success, error_msg)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+"""
+
 _INSERT_LOG = """
 INSERT INTO request_log
     (timestamp, user_prompt, route, model, latency_ms, tokens_in, tokens_out, success, error_msg)
@@ -75,6 +102,34 @@ class RequestMetrics:
         return int((time.monotonic() - self.start_time) * 1000)
 
 
+@dataclass
+class TraceLog:
+    """Captures the full reasoning chain for a conversation turn."""
+
+    start_time: float = field(default_factory=time.monotonic)
+    conversation_id: str = ""
+    user_prompt: str = ""
+    route: str = ""
+    route_pattern: str = ""
+    route_confidence: float = 0.0
+    model: str = ""
+    steps: list[str] = field(default_factory=list)
+    tool_calls: list[str] = field(default_factory=list)
+    response_summary: str = ""
+    success: bool = True
+    error_msg: str = ""
+
+    def step(self, description: str) -> None:
+        """Add a step to the reasoning trace."""
+        elapsed = int((time.monotonic() - self.start_time) * 1000)
+        self.steps.append(f"[{elapsed}ms] {description}")
+
+    @property
+    def latency_ms(self) -> int:
+        """Elapsed time in milliseconds since start."""
+        return int((time.monotonic() - self.start_time) * 1000)
+
+
 class AnalyticsStore:
     """SQLite-backed analytics and knowledge store."""
 
@@ -88,6 +143,7 @@ class AnalyticsStore:
         self._db = await aiosqlite.connect(str(self._db_path))
         await self._db.execute(_CREATE_TABLE)
         await self._db.execute(_CREATE_KNOWLEDGE_TABLE)
+        await self._db.execute(_CREATE_TRACE_TABLE)
         await self._db.commit()
         _LOGGER.debug("Analytics DB ready at %s", self._db_path)
 
@@ -123,6 +179,77 @@ class AnalyticsStore:
             await self._db.commit()
         except Exception:
             _LOGGER.exception("Failed to log analytics")
+
+    # ── Trace logging (train of thought) ─────────────────────────────────
+
+    async def async_log_trace(self, trace: TraceLog) -> None:
+        """Log the full reasoning chain for a conversation turn."""
+        if not self._db:
+            return
+        try:
+            import json as _json
+            await self._db.execute(
+                _INSERT_TRACE,
+                (
+                    datetime.now(timezone.utc).isoformat(),
+                    trace.conversation_id or None,
+                    trace.user_prompt[:500],
+                    trace.route,
+                    trace.route_pattern or None,
+                    trace.route_confidence,
+                    trace.model or None,
+                    _json.dumps(trace.steps),
+                    _json.dumps(trace.tool_calls) if trace.tool_calls else None,
+                    trace.response_summary[:500] if trace.response_summary else None,
+                    trace.latency_ms,
+                    1 if trace.success else 0,
+                    trace.error_msg[:500] if trace.error_msg else None,
+                ),
+            )
+            await self._db.commit()
+        except Exception:
+            _LOGGER.exception("Failed to log trace")
+
+    async def async_get_traces(
+        self, limit: int = 20
+    ) -> list[dict[str, Any]]:
+        """Return recent conversation traces for analysis."""
+        if not self._db:
+            return []
+        try:
+            import json as _json
+            cursor = await self._db.execute(
+                """
+                SELECT timestamp, conversation_id, user_prompt, route,
+                       route_pattern, route_confidence, model, steps,
+                       tool_calls, response_summary, latency_ms, success, error_msg
+                FROM conversation_trace
+                ORDER BY id DESC LIMIT ?
+                """,
+                (limit,),
+            )
+            rows = await cursor.fetchall()
+            return [
+                {
+                    "timestamp": r[0],
+                    "conversation_id": r[1],
+                    "prompt": r[2],
+                    "route": r[3],
+                    "pattern": r[4],
+                    "confidence": r[5],
+                    "model": r[6],
+                    "steps": _json.loads(r[7]) if r[7] else [],
+                    "tool_calls": _json.loads(r[8]) if r[8] else [],
+                    "response_summary": r[9],
+                    "latency_ms": r[10],
+                    "success": bool(r[11]),
+                    "error": r[12],
+                }
+                for r in rows
+            ]
+        except Exception:
+            _LOGGER.exception("Failed to get traces")
+            return []
 
     async def async_get_stats(
         self, hours: int = 24

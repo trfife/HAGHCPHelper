@@ -29,10 +29,11 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .acp_client import ACPClient, ACPError
 
 try:
-    from .analytics import AnalyticsStore, RequestMetrics
+    from .analytics import AnalyticsStore, RequestMetrics, TraceLog
 except ImportError:
     AnalyticsStore = None  # type: ignore[assignment,misc]
     RequestMetrics = None  # type: ignore[assignment,misc]
+    TraceLog = None  # type: ignore[assignment,misc]
 
 from .api import APIError, ChatCompletionClient, build_azure_client, build_github_client
 from .const import (
@@ -238,10 +239,19 @@ class GHCPConversationEntity(ConversationEntity):
         """Hybrid routing: local → Azure fast model → CLI expert fallback."""
         analytics = self.hass.data.get(DOMAIN, {}).get("analytics")
         metrics = RequestMetrics() if RequestMetrics else None
+        trace = TraceLog(
+            user_prompt=user_input.text[:500],
+            conversation_id=chat_log.conversation_id or "",
+        ) if TraceLog else None
 
         decision = classify_intent(user_input.text)
         if metrics:
             metrics.route = decision.route.value
+        if trace:
+            trace.route = decision.route.value
+            trace.route_pattern = decision.matched_pattern
+            trace.route_confidence = decision.confidence
+            trace.step(f"Router: {decision.route.value} (pattern={decision.matched_pattern}, conf={decision.confidence})")
 
         _LOGGER.info(
             "Hybrid router: route=%s pattern=%s prompt='%s'",
@@ -262,10 +272,15 @@ class GHCPConversationEntity(ConversationEntity):
                     )
                     if metrics:
                         metrics.model = router_model
+                    if trace:
+                        trace.model = router_model
+                        trace.step(f"LOCAL→Azure: using {router_model}")
                     result = await self._async_handle_azure_fast(
                         user_input, chat_log, data,
                         router_endpoint, router_key, router_model,
                     )
+                    if trace:
+                        trace.step("Azure response received")
                     return result
                 else:
                     # No Azure — fall through to CLI for LOCAL too
@@ -273,6 +288,10 @@ class GHCPConversationEntity(ConversationEntity):
                     if metrics:
                         metrics.route = Route.CLI.value
                         metrics.model = "copilot-cli"
+                    if trace:
+                        trace.step("No Azure creds — falling back to CLI")
+                        trace.route = Route.CLI.value
+                        trace.model = "copilot-cli"
                     return await self._async_handle_acp(
                         user_input, chat_log, data
                     )
@@ -289,31 +308,50 @@ class GHCPConversationEntity(ConversationEntity):
                         )
                         if metrics:
                             metrics.model = router_model
+                        if trace:
+                            trace.model = router_model
+                            trace.step(f"AZURE: using {router_model}")
                         result = await self._async_handle_azure_fast(
                             user_input, chat_log, data,
                             router_endpoint, router_key, router_model,
                         )
+                        if trace:
+                            trace.step("Azure response received")
                         return result
                     except Exception as err:
                         _LOGGER.warning(
                             "Azure fast model failed, falling back to CLI: %s",
                             err,
                         )
+                        if trace:
+                            trace.step(f"Azure FAILED: {err} — falling back to CLI")
                         # Fall through to CLI
                 else:
                     _LOGGER.debug("No Azure router configured, using CLI")
+                    if trace:
+                        trace.step("No Azure creds — using CLI")
 
             # ── CLI expert fallback (Route.CLI or Azure failed) ──────────
             if metrics:
                 metrics.route = Route.CLI.value
                 metrics.model = "copilot-cli"
-            return await self._async_handle_acp(user_input, chat_log, data)
+            if trace:
+                trace.step("CLI: sending to Copilot CLI via ACP")
+                trace.model = "copilot-cli"
+            result = await self._async_handle_acp(user_input, chat_log, data)
+            if trace:
+                trace.step("CLI response received")
+            return result
 
         except Exception as err:
             _LOGGER.exception("Hybrid routing error")
             if metrics:
                 metrics.success = False
                 metrics.error_msg = str(err)
+            if trace:
+                trace.success = False
+                trace.error_msg = str(err)
+                trace.step(f"FATAL ERROR: {err}")
 
             chat_log.async_add_assistant_content_without_tools(
                 AssistantContent(
@@ -332,6 +370,8 @@ class GHCPConversationEntity(ConversationEntity):
         finally:
             if analytics and metrics:
                 await analytics.async_log(user_input.text, metrics)
+            if analytics and trace:
+                await analytics.async_log_trace(trace)
 
     async def _async_handle_azure_fast(
         self,
