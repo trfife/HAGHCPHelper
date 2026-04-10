@@ -26,7 +26,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import intent, llm
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .acp_client import ACPClient, ACPError
+from .acp_client import ACPClient, ACPError, ACPResponse
 
 try:
     from .analytics import AnalyticsStore, RequestMetrics, TraceLog
@@ -50,6 +50,9 @@ from .const import (
     CONF_AZURE_ROUTER_KEY,
     CONF_AZURE_ROUTER_MODEL,
     CONF_BACKEND,
+    CONF_EMAIL_MODE,
+    CONF_EMAIL_NOTIFY_SERVICE,
+    CONF_EMAIL_THRESHOLD,
     CONF_EXPERT_MODEL,
     CONF_GITHUB_TOKEN,
     CONF_MAX_TOKENS,
@@ -57,13 +60,19 @@ from .const import (
     CONF_PROMPT,
     CONF_TEMPERATURE,
     DEFAULT_AZURE_ROUTER_MODEL,
+    DEFAULT_EMAIL_MODE,
+    DEFAULT_EMAIL_THRESHOLD,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
     DEFAULT_PROMPT,
     DEFAULT_TEMPERATURE,
     DOMAIN,
+    EMAIL_MODE_ALWAYS,
+    EMAIL_MODE_LONG_ONLY,
+    EMAIL_MODE_OFF,
     EXPERT_TOOL_NAME,
     KNOWLEDGE_TOOL_NAME,
+    MAX_EMAIL_THINKING_CHARS,
     ORCHESTRATOR_PROMPT_SUFFIX,
     SUBENTRY_TYPE_CONVERSATION,
 )
@@ -108,6 +117,8 @@ class GHCPConversationEntity(ConversationEntity):
         self._subentry = subentry
         # Persistent ACP session ID — survives across conversation turns
         self._acp_session_id: str | None = None
+        # Last thinking/reasoning content from ACP (for email)
+        self._last_thinking: str = ""
 
         if subentry:
             self._attr_unique_id = f"{config_entry.entry_id}_{subentry.subentry_id}"
@@ -169,15 +180,22 @@ class GHCPConversationEntity(ConversationEntity):
             user_input.text[:100],
         )
 
+        # Reset thinking for this turn
+        self._last_thinking = ""
+
         # ACP mode — forward prompt to Copilot CLI
         if backend == BACKEND_COPILOT_CLI:
-            return await self._async_handle_acp(user_input, chat_log, data)
-
+            result = await self._async_handle_acp(user_input, chat_log, data)
         # Hybrid mode — router decides: local → azure → cli fallback
-        if backend == BACKEND_HYBRID:
-            return await self._async_handle_hybrid(user_input, chat_log, data)
+        elif backend == BACKEND_HYBRID:
+            result = await self._async_handle_hybrid(user_input, chat_log, data)
+        else:
+            result = await self._async_handle_direct_api(user_input, chat_log, data)
 
-        return await self._async_handle_direct_api(user_input, chat_log, data)
+        # Send email notification if configured
+        await self._async_maybe_send_email(user_input.text, result, data)
+
+        return result
 
     async def _async_handle_acp(
         self,
@@ -203,10 +221,12 @@ class GHCPConversationEntity(ConversationEntity):
             )
             self._acp_session_id = session_id
 
-            content = await client.async_prompt(user_input.text)
+            acp_response = await client.async_prompt(user_input.text)
+            content = acp_response.text
+            self._last_thinking = acp_response.thinking
             _LOGGER.info(
-                "ACP response: %d chars, session=%s",
-                len(content), self._acp_session_id,
+                "ACP response: %d chars, thinking=%d chars, session=%s",
+                len(content), len(self._last_thinking), self._acp_session_id,
             )
         except ACPError as err:
             _LOGGER.error("ACP error: %s", err)
@@ -229,6 +249,80 @@ class GHCPConversationEntity(ConversationEntity):
             response=response_obj,
             conversation_id=chat_log.conversation_id,
         )
+
+    async def _async_maybe_send_email(
+        self,
+        user_prompt: str,
+        result: ConversationResult,
+        data: dict[str, Any],
+    ) -> None:
+        """Send an email with the response and thinking log if configured."""
+        email_mode = data.get(CONF_EMAIL_MODE, DEFAULT_EMAIL_MODE)
+        if email_mode == EMAIL_MODE_OFF:
+            return
+
+        service_name = data.get(CONF_EMAIL_NOTIFY_SERVICE, "")
+        if not service_name:
+            return
+
+        # Normalize: accept "notify.foo" or just "foo"
+        if service_name.startswith("notify."):
+            service_name = service_name[len("notify."):]
+
+        # Get the response text from the result
+        response_text = ""
+        if result.response and result.response.speech:
+            response_text = result.response.speech.get("plain", {}).get(
+                "speech", ""
+            )
+
+        if not response_text:
+            return
+
+        # Check threshold for long_only mode
+        if email_mode == EMAIL_MODE_LONG_ONLY:
+            threshold = int(
+                data.get(CONF_EMAIL_THRESHOLD, DEFAULT_EMAIL_THRESHOLD)
+            )
+            if len(response_text) < threshold:
+                return
+
+        # Build email body
+        thinking = self._last_thinking
+        if thinking and len(thinking) > MAX_EMAIL_THINKING_CHARS:
+            thinking = (
+                thinking[:MAX_EMAIL_THINKING_CHARS]
+                + f"\n\n... [truncated — {len(self._last_thinking):,} chars total]"
+            )
+
+        parts: list[str] = []
+        parts.append(f"## Your Message\n\n{user_prompt}")
+        if thinking:
+            parts.append(f"## Thinking / Reasoning\n\n{thinking}")
+        parts.append(f"## Response\n\n{response_text}")
+
+        body = "\n\n---\n\n".join(parts)
+        subject = f"Copilot: {user_prompt[:60]}"
+        if len(user_prompt) > 60:
+            subject += "…"
+
+        try:
+            await self.hass.services.async_call(
+                "notify",
+                service_name,
+                {"message": body, "title": subject},
+                blocking=False,
+            )
+            _LOGGER.info(
+                "Email sent via notify.%s (%d chars)",
+                service_name,
+                len(body),
+            )
+        except Exception:
+            _LOGGER.warning(
+                "Failed to send email via notify.%s", service_name,
+                exc_info=True,
+            )
 
     async def _async_handle_hybrid(
         self,

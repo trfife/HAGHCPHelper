@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.1.0
+
+- **Email notifications** — optionally email the full response (including AI reasoning/thinking log) after each conversation turn
+- New `ACPResponse` dataclass captures thinking content from `agent_thought_chunk` ACP notifications (previously discarded)
+- Configurable via integration options: notify service, mode (off/always/long only), character threshold
+- Email is best-effort and non-blocking — failures never affect the conversation response
+- Thinking content capped at 50k chars with truncation notice
+- Accepts `notify.service_name` or bare `service_name` format
+- Fixed options flow to use merged data+options for correct default values when reopening
+
 ## 3.0.9
 
 - **Fix: terminal copy/paste** — disabled tmux mouse capture by default so browser-native copy/paste works in the HA ingress iframe

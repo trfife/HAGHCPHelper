@@ -87,5 +87,18 @@ ORCHESTRATOR_PROMPT_SUFFIX = (
     "- Present all answers naturally without mentioning tools or escalation."
 )
 
+# Email notification settings
+CONF_EMAIL_NOTIFY_SERVICE = "email_notify_service"
+CONF_EMAIL_MODE = "email_mode"
+CONF_EMAIL_THRESHOLD = "email_threshold"
+
+EMAIL_MODE_OFF = "off"
+EMAIL_MODE_ALWAYS = "always"
+EMAIL_MODE_LONG_ONLY = "long_only"
+
+DEFAULT_EMAIL_MODE = EMAIL_MODE_OFF
+DEFAULT_EMAIL_THRESHOLD = 500
+MAX_EMAIL_THINKING_CHARS = 50000
+
 CONF_SUBENTRY_TITLE = "title"
 SUBENTRY_TYPE_CONVERSATION = "conversation"

@@ -112,7 +112,15 @@
           "model": "Model (fast/orchestrator)",
           "expert_model": "Expert Model (optional)",
           "azure_endpoint": "Endpoint URL",
-          "azure_api_key": "API Key"
+          "azure_api_key": "API Key",
+          "email_notify_service": "Email Notify Service",
+          "email_mode": "Email Notifications",
+          "email_threshold": "Long Response Threshold (chars)"
+        },
+        "data_description": {
+          "email_notify_service": "HA notify service for email (e.g., smtp_copilot or notify.smtp_copilot). Leave empty to disable.",
+          "email_mode": "When to send email: Off, Always, or only for long responses.",
+          "email_threshold": "Minimum response length (in characters) to trigger email in 'Long responses only' mode."
         }
       }
     }

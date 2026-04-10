@@ -9,6 +9,7 @@ Protocol reference: https://agentclientprotocol.com/protocol/overview
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass, field
 import json
 import logging
 from typing import Any
@@ -17,7 +18,15 @@ _LOGGER = logging.getLogger(__name__)
 
 ACP_PROTOCOL_VERSION = 1
 CLIENT_NAME = "ghcp_conversation"
-CLIENT_VERSION = "3.0.9"
+CLIENT_VERSION = "3.1.0"
+
+
+@dataclass
+class ACPResponse:
+    """Structured response from an ACP prompt."""
+
+    text: str
+    thinking: str = ""
 
 
 class ACPError(Exception):
@@ -261,11 +270,12 @@ class ACPClient:
         text: str,
         session_id: str | None = None,
         timeout: float = 180.0,
-    ) -> str:
+    ) -> ACPResponse:
         """Send a user prompt and collect the full agent response.
 
         Handles streaming session/update notifications, auto-approves
-        permission requests, and returns the accumulated text response.
+        permission requests, and returns the accumulated text response
+        along with any reasoning/thinking content.
         """
         sid = session_id or self._session_id
         if not sid:
@@ -280,6 +290,7 @@ class ACPClient:
         )
 
         response_text: list[str] = []
+        thinking_text: list[str] = []
         deadline = asyncio.get_event_loop().time() + timeout
 
         while True:
@@ -301,7 +312,7 @@ class ACPClient:
 
             # --- Notification (no "id") ---------------------------------
             if "id" not in msg:
-                self._handle_notification(msg, response_text)
+                self._handle_notification(msg, response_text, thinking_text)
                 continue
 
             # --- Agent request to client (has "id" + "method") ----------
@@ -309,14 +320,18 @@ class ACPClient:
                 await self._handle_agent_request(msg)
                 continue
 
-        return "".join(response_text).strip()
+        return ACPResponse(
+            text="".join(response_text).strip(),
+            thinking="".join(thinking_text).strip(),
+        )
 
     # ------------------------------------------------------------------
     # Internal handlers
     # ------------------------------------------------------------------
 
     def _handle_notification(
-        self, msg: dict[str, Any], response_text: list[str]
+        self, msg: dict[str, Any], response_text: list[str],
+        thinking_text: list[str] | None = None,
     ) -> None:
         """Process a session/update notification."""
         params = msg.get("params", {})
@@ -328,8 +343,9 @@ class ACPClient:
             if content.get("type") == "text":
                 response_text.append(content.get("text", ""))
         elif update_type == "agent_thought_chunk":
-            # Reasoning; ignore for final output
-            pass
+            content = update.get("content", {})
+            if content.get("type") == "text" and thinking_text is not None:
+                thinking_text.append(content.get("text", ""))
         elif update_type in ("tool_call", "tool_call_update"):
             _LOGGER.debug("ACP tool activity: %s", update.get("title", update_type))
         elif update_type == "plan":

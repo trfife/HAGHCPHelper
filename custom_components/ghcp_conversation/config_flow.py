@@ -52,6 +52,9 @@ from .const import (
     CONF_AZURE_ROUTER_KEY,
     CONF_AZURE_ROUTER_MODEL,
     CONF_BACKEND,
+    CONF_EMAIL_MODE,
+    CONF_EMAIL_NOTIFY_SERVICE,
+    CONF_EMAIL_THRESHOLD,
     CONF_EXPERT_MODEL,
     CONF_GITHUB_TOKEN,
     CONF_MAX_TOKENS,
@@ -59,11 +62,16 @@ from .const import (
     CONF_PROMPT,
     CONF_TEMPERATURE,
     DEFAULT_AZURE_ROUTER_MODEL,
+    DEFAULT_EMAIL_MODE,
+    DEFAULT_EMAIL_THRESHOLD,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
     DEFAULT_PROMPT,
     DEFAULT_TEMPERATURE,
     DOMAIN,
+    EMAIL_MODE_ALWAYS,
+    EMAIL_MODE_LONG_ONLY,
+    EMAIL_MODE_OFF,
     FALLBACK_MODELS,
     GITHUB_OAUTH_CLIENT_ID,
     SUBENTRY_TYPE_CONVERSATION,
@@ -635,12 +643,14 @@ class GHCPOptionsFlow(OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(data=user_input)
 
-        entry_data = self.config_entry.data
-        backend = entry_data.get(CONF_BACKEND, BACKEND_GITHUB)
+        # Merge data + options for correct defaults when reopening
+        merged = dict(self.config_entry.data)
+        merged.update(self.config_entry.options)
+        backend = merged.get(CONF_BACKEND, BACKEND_GITHUB)
 
         schema_dict: dict[Any, Any] = {}
         if backend == BACKEND_GITHUB:
-            token = entry_data.get(CONF_GITHUB_TOKEN, "")
+            token = merged.get(CONF_GITHUB_TOKEN, "")
             # Fetch live model list
             model_options: list[dict[str, str]] = []
             if token:
@@ -663,7 +673,7 @@ class GHCPOptionsFlow(OptionsFlow):
             schema_dict[
                 vol.Optional(
                     CONF_MODEL,
-                    default=entry_data.get(CONF_MODEL, DEFAULT_MODEL),
+                    default=merged.get(CONF_MODEL, DEFAULT_MODEL),
                 )
             ] = SelectSelector(
                 SelectSelectorConfig(
@@ -675,7 +685,7 @@ class GHCPOptionsFlow(OptionsFlow):
             schema_dict[
                 vol.Optional(
                     CONF_EXPERT_MODEL,
-                    default=entry_data.get(CONF_EXPERT_MODEL, ""),
+                    default=merged.get(CONF_EXPERT_MODEL, ""),
                 )
             ] = SelectSelector(
                 SelectSelectorConfig(
@@ -689,21 +699,54 @@ class GHCPOptionsFlow(OptionsFlow):
             schema_dict[
                 vol.Required(
                     CONF_AZURE_ENDPOINT,
-                    default=entry_data.get(CONF_AZURE_ENDPOINT, ""),
+                    default=merged.get(CONF_AZURE_ENDPOINT, ""),
                 )
             ] = TextSelector(TextSelectorConfig(type=TextSelectorType.URL))
             schema_dict[
                 vol.Required(
                     CONF_AZURE_API_KEY,
-                    default=entry_data.get(CONF_AZURE_API_KEY, ""),
+                    default=merged.get(CONF_AZURE_API_KEY, ""),
                 )
             ] = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
             schema_dict[
                 vol.Required(
                     CONF_MODEL,
-                    default=entry_data.get(CONF_MODEL, ""),
+                    default=merged.get(CONF_MODEL, ""),
                 )
             ] = TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT))
+
+        # Email notification settings (available for all backends)
+        schema_dict[
+            vol.Optional(
+                CONF_EMAIL_NOTIFY_SERVICE,
+                default=merged.get(CONF_EMAIL_NOTIFY_SERVICE, ""),
+            )
+        ] = TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT))
+        schema_dict[
+            vol.Optional(
+                CONF_EMAIL_MODE,
+                default=merged.get(CONF_EMAIL_MODE, DEFAULT_EMAIL_MODE),
+            )
+        ] = SelectSelector(
+            SelectSelectorConfig(
+                options=[
+                    {"value": EMAIL_MODE_OFF, "label": "Off"},
+                    {"value": EMAIL_MODE_ALWAYS, "label": "Always"},
+                    {"value": EMAIL_MODE_LONG_ONLY, "label": "Long responses only"},
+                ],
+                mode=SelectSelectorMode.DROPDOWN,
+            )
+        )
+        schema_dict[
+            vol.Optional(
+                CONF_EMAIL_THRESHOLD,
+                default=merged.get(CONF_EMAIL_THRESHOLD, DEFAULT_EMAIL_THRESHOLD),
+            )
+        ] = NumberSelector(
+            NumberSelectorConfig(
+                min=100, max=10000, step=100, mode=NumberSelectorMode.BOX,
+            )
+        )
 
         return self.async_show_form(
             step_id="init",
