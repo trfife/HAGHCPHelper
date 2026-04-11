@@ -75,12 +75,51 @@ from .const import (
     MAX_EMAIL_THINKING_CHARS,
     ORCHESTRATOR_PROMPT_SUFFIX,
     SUBENTRY_TYPE_CONVERSATION,
+    VOICE_DETAIL_SEPARATOR,
 )
 from .router import Route, classify_intent
 
 _LOGGER = logging.getLogger(__name__)
 
 MAX_TOOL_ITERATIONS = 10
+
+# Max sentences to use as spoken portion when no separator is present
+_VOICE_MAX_SENTENCES = 2
+
+
+def split_response_for_voice(content: str) -> tuple[str, str]:
+    """Split a response into (spoken, full) parts.
+
+    If ``[[DETAIL]]`` is present, the text before it is spoken and the entire
+    content (with the marker stripped) is the full version for email.
+
+    When the marker is absent, the first 1–2 sentences become the spoken part
+    and the full text is used for email.  If the response is already short
+    (≤2 sentences), both values are identical.
+    """
+    if not content:
+        return ("", "")
+
+    sep = VOICE_DETAIL_SEPARATOR
+    if sep in content:
+        parts = content.split(sep, 1)
+        spoken = parts[0].strip()
+        detail = parts[1].strip() if len(parts) > 1 else ""
+        # Full email version = spoken + detail, marker removed
+        full = f"{spoken}\n\n{detail}".strip() if detail else spoken
+        return (spoken, full)
+
+    # Fallback: split on sentence boundaries (., !, ?)
+    sentence_ends = re.finditer(r'[.!?](?:\s|$)', content)
+    positions = [m.end() for m in sentence_ends]
+
+    if len(positions) >= _VOICE_MAX_SENTENCES and positions[_VOICE_MAX_SENTENCES - 1] < len(content) - 5:
+        cut = positions[_VOICE_MAX_SENTENCES - 1]
+        spoken = content[:cut].strip()
+        return (spoken, content.strip())
+
+    # Short enough — use as-is for both
+    return (content.strip(), content.strip())
 
 
 async def async_setup_entry(
@@ -119,6 +158,8 @@ class GHCPConversationEntity(ConversationEntity):
         self._acp_session_id: str | None = None
         # Last thinking/reasoning content from ACP (for email)
         self._last_thinking: str = ""
+        # Full response text for email (may include detail stripped from speech)
+        self._last_full_response: str = ""
 
         if subentry:
             self._attr_unique_id = f"{config_entry.entry_id}_{subentry.subentry_id}"
@@ -182,6 +223,7 @@ class GHCPConversationEntity(ConversationEntity):
 
         # Reset thinking for this turn
         self._last_thinking = ""
+        self._last_full_response = ""
 
         # ACP mode — forward prompt to Copilot CLI
         if backend == BACKEND_COPILOT_CLI:
@@ -222,11 +264,18 @@ class GHCPConversationEntity(ConversationEntity):
             self._acp_session_id = session_id
 
             acp_response = await client.async_prompt(user_input.text)
-            content = acp_response.text
+            raw_content = acp_response.text
             self._last_thinking = acp_response.thinking
+
+            # Split for voice: short spoken part vs full email content
+            spoken, full = split_response_for_voice(raw_content)
+            content = spoken
+            self._last_full_response = full
+
             _LOGGER.info(
-                "ACP response: %d chars, thinking=%d chars, session=%s",
-                len(content), len(self._last_thinking), self._acp_session_id,
+                "ACP response: %d chars (spoken=%d, full=%d), thinking=%d chars, session=%s",
+                len(raw_content), len(spoken), len(full),
+                len(self._last_thinking), self._acp_session_id,
             )
         except ACPError as err:
             _LOGGER.error("ACP error: %s", err)
@@ -269,17 +318,19 @@ class GHCPConversationEntity(ConversationEntity):
         if service_name.startswith("notify."):
             service_name = service_name[len("notify."):]
 
-        # Get the response text from the result
-        response_text = ""
-        if result.response and result.response.speech:
-            response_text = result.response.speech.get("plain", {}).get(
-                "speech", ""
-            )
+        # Get the response text — prefer the full (unsplit) response for email
+        response_text = self._last_full_response
+        if not response_text:
+            # Fallback: use spoken text from the result
+            if result.response and result.response.speech:
+                response_text = result.response.speech.get("plain", {}).get(
+                    "speech", ""
+                )
 
         if not response_text:
             return
 
-        # Check threshold for long_only mode
+        # Check threshold for long_only mode (measure full response, not spoken)
         if email_mode == EMAIL_MODE_LONG_ONLY:
             threshold = int(
                 data.get(CONF_EMAIL_THRESHOLD, DEFAULT_EMAIL_THRESHOLD)
@@ -563,11 +614,15 @@ class GHCPConversationEntity(ConversationEntity):
                     "Please try a simpler request."
                 )
 
+        # Split for voice: short spoken part vs full email content
+        spoken, full = split_response_for_voice(content)
+        self._last_full_response = full
+
         chat_log.async_add_assistant_content_without_tools(
-            AssistantContent(agent_id=user_input.agent_id, content=content)
+            AssistantContent(agent_id=user_input.agent_id, content=spoken)
         )
         response_obj = intent.IntentResponse(language=user_input.language)
-        response_obj.async_set_speech(content)
+        response_obj.async_set_speech(spoken)
         return ConversationResult(
             response=response_obj,
             conversation_id=chat_log.conversation_id,
@@ -669,13 +724,17 @@ class GHCPConversationEntity(ConversationEntity):
                 _LOGGER.exception("Unexpected error in conversation")
                 content = "Sorry, an unexpected error occurred."
 
-        # Add the final response to the chat log
+        # Split for voice: short spoken part vs full email content
+        spoken, full = split_response_for_voice(content)
+        self._last_full_response = full
+
+        # Add the short spoken version to the chat log
         chat_log.async_add_assistant_content_without_tools(
-            AssistantContent(agent_id=user_input.agent_id, content=content)
+            AssistantContent(agent_id=user_input.agent_id, content=spoken)
         )
 
         response_obj = intent.IntentResponse(language=user_input.language)
-        response_obj.async_set_speech(content)
+        response_obj.async_set_speech(spoken)
 
         return ConversationResult(
             response=response_obj,
