@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any, Literal
 
 import aiohttp
@@ -86,6 +87,33 @@ MAX_TOOL_ITERATIONS = 10
 # Max sentences to use as spoken portion when no separator is present
 _VOICE_MAX_SENTENCES = 2
 
+# Regex to match emojis and other symbols that ElevenLabs strips to empty text
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001F600-\U0001F64F"  # emoticons
+    "\U0001F300-\U0001F5FF"  # symbols & pictographs
+    "\U0001F680-\U0001F6FF"  # transport & map
+    "\U0001F1E0-\U0001F1FF"  # flags
+    "\U00002702-\U000027B0"  # dingbats
+    "\U0000FE00-\U0000FE0F"  # variation selectors
+    "\U0000200D"             # zero-width joiner
+    "\U000020E3"             # combining enclosing keycap
+    "\U0001F900-\U0001F9FF"  # supplemental symbols
+    "\U0001FA00-\U0001FA6F"  # chess symbols
+    "\U0001FA70-\U0001FAFF"  # symbols extended-A
+    "]+",
+    flags=re.UNICODE,
+)
+
+
+def _sanitize_for_tts(text: str) -> str:
+    """Remove emojis and ensure text isn't empty after ElevenLabs tag stripping."""
+    # Strip emojis
+    text = _EMOJI_RE.sub("", text)
+    # Clean up extra whitespace left behind
+    text = re.sub(r"  +", " ", text).strip()
+    return text
+
 
 def split_response_for_voice(content: str) -> tuple[str, str]:
     """Split a response into (spoken, full) parts.
@@ -107,6 +135,8 @@ def split_response_for_voice(content: str) -> tuple[str, str]:
         detail = parts[1].strip() if len(parts) > 1 else ""
         # Full email version = spoken + detail, marker removed
         full = f"{spoken}\n\n{detail}".strip() if detail else spoken
+        # Sanitize spoken part for TTS
+        spoken = _sanitize_for_tts(spoken)
         return (spoken, full)
 
     # Fallback: split on sentence boundaries (., !, ?)
@@ -115,11 +145,12 @@ def split_response_for_voice(content: str) -> tuple[str, str]:
 
     if len(positions) >= _VOICE_MAX_SENTENCES and positions[_VOICE_MAX_SENTENCES - 1] < len(content) - 5:
         cut = positions[_VOICE_MAX_SENTENCES - 1]
-        spoken = content[:cut].strip()
+        spoken = _sanitize_for_tts(content[:cut].strip())
         return (spoken, content.strip())
 
     # Short enough — use as-is for both
-    return (content.strip(), content.strip())
+    spoken = _sanitize_for_tts(content.strip())
+    return (spoken, content.strip())
 
 
 async def async_setup_entry(

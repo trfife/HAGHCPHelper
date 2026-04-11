@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.2.1
+
+- **Fix: missing `import re`** — v3.2.0 removed the `re` import but `split_response_for_voice()` uses `re.finditer()`, causing `NameError` on every conversation turn
+- **Fix: ElevenLabs TTS empty text crash** — AI responses starting with unsupported tags (e.g. `[chuckle]`) or emojis caused ElevenLabs to reject the entire TTS request with "empty text after removing speaker tags and emojis"
+- **Prompt hardening** — explicitly prohibit emojis, restrict to the 8 supported ElevenLabs tags, require tags inline with text (never standalone)
+- **Emoji sanitizer** — `_sanitize_for_tts()` strips emojis from spoken text as a safety net even if the model ignores prompt rules
+
 ## 3.2.0
 
 - **Voice tagging** — prompt updated with ElevenLabs v3 audio tag guidance (`[sighs]`, `[laughs]`, etc.) for expressive TTS
