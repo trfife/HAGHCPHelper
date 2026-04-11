@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.2.0
+
+- **Voice tagging** — prompt updated with ElevenLabs v3 audio tag guidance (`[sighs]`, `[laughs]`, etc.) for expressive TTS
+- **Short spoken responses** — model instructed to keep spoken replies to 1-2 sentences
+- **Email detail splitting** — `[[DETAIL]]` separator splits verbose content into spoken vs. emailed portions; `split_response_for_voice()` helper with sentence-based fallback
+- Email notifications now use full response text; chat log keeps short spoken version to reduce token usage
+
 ## 3.1.0
 
 - **Email notifications** — optionally email the full response (including AI reasoning/thinking log) after each conversation turn
