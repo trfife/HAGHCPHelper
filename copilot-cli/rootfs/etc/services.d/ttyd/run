@@ -814,6 +814,14 @@ alias ssh-key="cat /root/.ssh/id_ed25519.pub"
 RCEOF
 
 # -------------------------------------------------------
+# Refresh entity cache at startup (background, non-blocking)
+# -------------------------------------------------------
+if [ -f /homeassistant/scripts/entity_cache.py ]; then
+    bashio::log.info "Refreshing entity cache in background..."
+    python3 /homeassistant/scripts/entity_cache.py refresh &>/dev/null &
+fi
+
+# -------------------------------------------------------
 # Get ingress port
 # -------------------------------------------------------
 ingress_port=$(bashio::addon.ingress_port)
