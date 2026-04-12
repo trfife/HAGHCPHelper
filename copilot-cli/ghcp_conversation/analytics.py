@@ -17,6 +17,28 @@ _LOGGER = logging.getLogger(__name__)
 
 ANALYTICS_DB = "ghcp_conversation_analytics.db"
 
+SHARED_CONTEXT_MAX_ENTRIES = 100
+SHARED_CONTEXT_MAX_AGE_HOURS = 48
+SHARED_CONTEXT_SUMMARY_LIMIT = 200  # chars
+
+_CREATE_SHARED_CONTEXT_TABLE = """
+CREATE TABLE IF NOT EXISTS shared_context (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL,
+    source TEXT NOT NULL,
+    prompt_summary TEXT NOT NULL,
+    response_summary TEXT,
+    conversation_id TEXT,
+    tags TEXT
+)
+"""
+
+_INSERT_SHARED_CONTEXT = """
+INSERT INTO shared_context
+    (timestamp, source, prompt_summary, response_summary, conversation_id, tags)
+VALUES (?, ?, ?, ?, ?, ?)
+"""
+
 _CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS request_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -144,6 +166,7 @@ class AnalyticsStore:
         await self._db.execute(_CREATE_TABLE)
         await self._db.execute(_CREATE_KNOWLEDGE_TABLE)
         await self._db.execute(_CREATE_TRACE_TABLE)
+        await self._db.execute(_CREATE_SHARED_CONTEXT_TABLE)
         await self._db.commit()
         _LOGGER.debug("Analytics DB ready at %s", self._db_path)
 
@@ -434,3 +457,112 @@ class AnalyticsStore:
         await self._db.commit()
         _LOGGER.info("Migrated %d entries from JSON knowledge store", count)
         return count
+
+    # ── Shared context (cross-interface memory) ──────────────────────────
+
+    @property
+    def db_path(self) -> Path:
+        """Return the path to the analytics database."""
+        return self._db_path
+
+    async def async_append_shared_context(
+        self,
+        source: str,
+        prompt_summary: str,
+        response_summary: str = "",
+        conversation_id: str = "",
+        tags: str = "",
+    ) -> None:
+        """Append a conversation summary to shared context."""
+        if not self._db:
+            return
+        try:
+            await self._db.execute(
+                _INSERT_SHARED_CONTEXT,
+                (
+                    datetime.now(timezone.utc).isoformat(),
+                    source,
+                    prompt_summary[:SHARED_CONTEXT_SUMMARY_LIMIT],
+                    (response_summary[:SHARED_CONTEXT_SUMMARY_LIMIT]
+                     if response_summary else None),
+                    conversation_id or None,
+                    tags or None,
+                ),
+            )
+            await self._db.commit()
+            await self._async_prune_shared_context()
+        except Exception:
+            _LOGGER.exception("Failed to append shared context")
+
+    async def async_read_shared_context(
+        self,
+        exclude_source: str | None = None,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Read recent shared context entries, optionally excluding a source."""
+        if not self._db:
+            return []
+        try:
+            if exclude_source:
+                cursor = await self._db.execute(
+                    """
+                    SELECT timestamp, source, prompt_summary,
+                           response_summary, conversation_id
+                    FROM shared_context
+                    WHERE source != ?
+                    ORDER BY id DESC LIMIT ?
+                    """,
+                    (exclude_source, limit),
+                )
+            else:
+                cursor = await self._db.execute(
+                    """
+                    SELECT timestamp, source, prompt_summary,
+                           response_summary, conversation_id
+                    FROM shared_context
+                    ORDER BY id DESC LIMIT ?
+                    """,
+                    (limit,),
+                )
+            rows = await cursor.fetchall()
+            return [
+                {
+                    "timestamp": r[0],
+                    "source": r[1],
+                    "prompt": r[2],
+                    "response": r[3],
+                    "conversation_id": r[4],
+                }
+                for r in reversed(rows)  # chronological order
+            ]
+        except Exception:
+            _LOGGER.exception("Failed to read shared context")
+            return []
+
+    async def _async_prune_shared_context(self) -> None:
+        """Remove old entries beyond the retention window."""
+        if not self._db:
+            return
+        try:
+            cutoff = datetime.now(timezone.utc).isoformat()
+            await self._db.execute(
+                """
+                DELETE FROM shared_context
+                WHERE timestamp < datetime(?, '-' || ? || ' hours')
+                """,
+                (cutoff, SHARED_CONTEXT_MAX_AGE_HOURS),
+            )
+            # Also cap total entries
+            await self._db.execute(
+                """
+                DELETE FROM shared_context
+                WHERE id NOT IN (
+                    SELECT id FROM shared_context
+                    ORDER BY id DESC LIMIT ?
+                )
+                """,
+                (SHARED_CONTEXT_MAX_ENTRIES,),
+            )
+            await self._db.commit()
+        except Exception:
+            _LOGGER.debug("Failed to prune shared context")

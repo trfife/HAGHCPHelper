@@ -268,6 +268,11 @@ class GHCPConversationEntity(ConversationEntity):
         # Send email notification if configured
         await self._async_maybe_send_email(user_input.text, result, data)
 
+        # Write to shared context for cross-interface memory
+        await self._async_write_shared_context(
+            user_input.text, result, chat_log.conversation_id
+        )
+
         return result
 
     async def _async_handle_acp(
@@ -292,9 +297,17 @@ class GHCPConversationEntity(ConversationEntity):
                 session_id=self._acp_session_id,
                 cwd="/homeassistant",
             )
+            is_new_session = session_id != self._acp_session_id
             self._acp_session_id = session_id
 
-            acp_response = await client.async_prompt(user_input.text)
+            # Seed new ACP sessions with cross-interface context
+            prompt_text = user_input.text
+            if is_new_session:
+                context_prefix = await self._async_get_shared_context_prefix()
+                if context_prefix:
+                    prompt_text = context_prefix + "\n\n" + prompt_text
+
+            acp_response = await client.async_prompt(prompt_text)
             raw_content = acp_response.text
             self._last_thinking = acp_response.thinking
 
@@ -405,6 +418,92 @@ class GHCPConversationEntity(ConversationEntity):
                 "Failed to send email via notify.%s", service_name,
                 exc_info=True,
             )
+
+    async def _async_write_shared_context(
+        self,
+        user_prompt: str,
+        result: ConversationResult,
+        conversation_id: str | None,
+    ) -> None:
+        """Write a conversation summary to shared context (fail-open)."""
+        try:
+            analytics: AnalyticsStore | None = self.hass.data.get(
+                DOMAIN, {}
+            ).get("analytics")
+            if not analytics:
+                return
+
+            # Extract response text — prefer full response, fall back to speech
+            response_text = self._last_full_response
+            if not response_text and result.response and result.response.speech:
+                response_text = result.response.speech.get("plain", {}).get(
+                    "speech", ""
+                )
+
+            await analytics.async_append_shared_context(
+                source="assist",
+                prompt_summary=user_prompt,
+                response_summary=response_text or "",
+                conversation_id=conversation_id or "",
+            )
+        except Exception:
+            _LOGGER.debug("Shared context write failed (non-fatal)")
+
+    def _build_cross_interface_context(self, entries: list[dict]) -> str:
+        """Format shared context entries as background context string."""
+        if not entries:
+            return ""
+        lines = [
+            "Recent activity from other interface (for background context only):"
+        ]
+        for e in entries:
+            src = e.get("source", "unknown")
+            ts = e.get("timestamp", "")[:16]  # trim to minute
+            prompt = e.get("prompt", "")
+            resp = e.get("response", "")
+            line = f"- [{ts}] ({src}) User: {prompt}"
+            if resp:
+                line += f" → {resp}"
+            lines.append(line)
+        return "\n".join(lines)
+
+    async def _async_enrich_with_shared_context(
+        self,
+        system_prompt: str,
+        exclude_source: str = "assist",
+    ) -> str:
+        """Append recent cross-interface context to the system prompt (fail-open)."""
+        try:
+            analytics: AnalyticsStore | None = self.hass.data.get(
+                DOMAIN, {}
+            ).get("analytics")
+            if not analytics:
+                return system_prompt
+            entries = await analytics.async_read_shared_context(
+                exclude_source=exclude_source, limit=10
+            )
+            context_block = self._build_cross_interface_context(entries)
+            if context_block:
+                return system_prompt + "\n\n" + context_block
+        except Exception:
+            _LOGGER.debug("Shared context read failed (non-fatal)")
+        return system_prompt
+
+    async def _async_get_shared_context_prefix(self) -> str:
+        """Get shared context formatted as a prompt prefix for ACP sessions."""
+        try:
+            analytics: AnalyticsStore | None = self.hass.data.get(
+                DOMAIN, {}
+            ).get("analytics")
+            if not analytics:
+                return ""
+            entries = await analytics.async_read_shared_context(
+                exclude_source="assist", limit=10
+            )
+            return self._build_cross_interface_context(entries)
+        except Exception:
+            _LOGGER.debug("Shared context prefix failed (non-fatal)")
+            return ""
 
     async def _async_handle_hybrid(
         self,
@@ -579,6 +678,11 @@ class GHCPConversationEntity(ConversationEntity):
         if chat_log.llm_api:
             system_prompt = chat_log.llm_api.api_prompt
 
+        # Inject cross-interface context (CLI activity) into system prompt
+        system_prompt = await self._async_enrich_with_shared_context(
+            system_prompt, exclude_source="assist"
+        )
+
         messages = self._build_messages(system_prompt, chat_log)
         tools = self._build_tools(chat_log)
 
@@ -688,6 +792,11 @@ class GHCPConversationEntity(ConversationEntity):
         # Append orchestrator instructions when expert model is configured
         if expert_model:
             system_prompt += ORCHESTRATOR_PROMPT_SUFFIX
+
+        # Inject cross-interface context (CLI activity) into system prompt
+        system_prompt = await self._async_enrich_with_shared_context(
+            system_prompt, exclude_source="assist"
+        )
 
         # Build messages from chat log
         messages = self._build_messages(system_prompt, chat_log)
