@@ -273,14 +273,17 @@ class GHCPConversationEntity(ConversationEntity):
         # Reset thinking for this turn
         self._last_thinking = ""
         self._last_full_response = ""
+        self._last_route_trace: list[str] = []
 
         # ACP mode — forward prompt to Copilot CLI
         if backend == BACKEND_COPILOT_CLI:
+            self._last_route_trace = [f"Backend: {backend} (direct ACP)"]
             result = await self._async_handle_acp(user_input, chat_log, data)
         # Hybrid mode — router decides: local → azure → cli fallback
         elif backend == BACKEND_HYBRID:
             result = await self._async_handle_hybrid(user_input, chat_log, data)
         else:
+            self._last_route_trace = [f"Backend: {backend} (direct API)"]
             result = await self._async_handle_direct_api(user_input, chat_log, data)
 
         # Send email notification if configured
@@ -410,6 +413,12 @@ class GHCPConversationEntity(ConversationEntity):
 
         parts: list[str] = []
         parts.append(f"## Your Message\n\n{user_prompt}")
+
+        # Include routing trace so user can see the flow
+        if self._last_route_trace:
+            trace_lines = "\n".join(f"- {s}" for s in self._last_route_trace)
+            parts.append(f"## Routing Flow\n\n{trace_lines}")
+
         if thinking:
             parts.append(f"## Thinking / Reasoning\n\n{thinking}")
         parts.append(f"## Response\n\n{response_text}")
@@ -661,6 +670,8 @@ class GHCPConversationEntity(ConversationEntity):
                 conversation_id=chat_log.conversation_id,
             )
         finally:
+            if trace:
+                self._last_route_trace = list(trace.steps)
             if analytics and metrics:
                 await analytics.async_log(user_input.text, metrics)
             if analytics and trace:
