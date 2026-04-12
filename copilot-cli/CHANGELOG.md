@@ -11,6 +11,7 @@
 - Copilot instructions updated with shared context documentation
 - Auto-pruning: entries older than 48 hours or exceeding 100 total are cleaned up
 - Fully fail-open: shared context errors never break normal conversation flow
+- **Fix: Azure tool serialization crash** — `tool.parameters` (a `vol.Schema`) was passed directly to JSON, causing `Object of type Schema is not JSON serializable` on every Azure call. Now uses `voluptuous_openapi.convert()` to properly serialize tool schemas. This was causing **100% of Azure-routed requests to fall back to CLI**.
 
 ## 3.2.1
 

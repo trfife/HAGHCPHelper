@@ -27,6 +27,11 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import intent, llm
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+try:
+    from voluptuous_openapi import convert as vol_to_openapi
+except ImportError:
+    vol_to_openapi = None  # type: ignore[assignment]
+
 from .acp_client import ACPClient, ACPError, ACPResponse
 
 try:
@@ -915,6 +920,9 @@ class GHCPConversationEntity(ConversationEntity):
         tools: list[dict[str, Any]] = []
 
         if chat_log.llm_api and chat_log.llm_api.tools:
+            custom_serializer = getattr(
+                chat_log.llm_api, "custom_serializer", None
+            )
             for tool in chat_log.llm_api.tools:
                 tool_def: dict[str, Any] = {
                     "type": "function",
@@ -924,7 +932,21 @@ class GHCPConversationEntity(ConversationEntity):
                     },
                 }
                 if tool.parameters:
-                    tool_def["function"]["parameters"] = tool.parameters
+                    # tool.parameters is a vol.Schema — convert to JSON dict
+                    if vol_to_openapi is not None:
+                        try:
+                            tool_def["function"]["parameters"] = vol_to_openapi(
+                                tool.parameters,
+                                custom_serializer=custom_serializer,
+                            )
+                        except Exception:
+                            _LOGGER.debug(
+                                "Failed to convert schema for tool %s, skipping",
+                                tool.name,
+                            )
+                            continue
+                    else:
+                        tool_def["function"]["parameters"] = tool.parameters
                 tools.append(tool_def)
 
         # Inject orchestrator tools when expert model is configured
