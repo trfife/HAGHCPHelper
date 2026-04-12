@@ -92,6 +92,19 @@ MAX_TOOL_ITERATIONS = 10
 # Max sentences to use as spoken portion when no separator is present
 _VOICE_MAX_SENTENCES = 2
 
+# Voice instructions prepended to ACP prompts so CLI knows to be concise
+_ACP_VOICE_PREFIX = (
+    "[VOICE MODE] This response will be spoken aloud via ElevenLabs TTS. Rules:\n"
+    "- Keep your response to 1–2 sentences MAX. Be brief and conversational.\n"
+    "- No emojis. You may use these ElevenLabs audio tags inline with text: "
+    "[sighs], [laughs], [clears throat], [gasps], [grunt], [exhales], "
+    "[giggles], [crying].\n"
+    "- Audio tags must appear inline with spoken text, never alone on a line.\n"
+    "- If the answer needs detail, give a short spoken summary first, then "
+    "put [[DETAIL]] on its own line, followed by the full answer.\n\n"
+    "User said: "
+)
+
 # Regex to match emojis and other symbols that ElevenLabs strips to empty text
 _EMOJI_RE = re.compile(
     "["
@@ -306,7 +319,7 @@ class GHCPConversationEntity(ConversationEntity):
             self._acp_session_id = session_id
 
             # Seed new ACP sessions with cross-interface context
-            prompt_text = user_input.text
+            prompt_text = _ACP_VOICE_PREFIX + user_input.text
             if is_new_session:
                 context_prefix = await self._async_get_shared_context_prefix()
                 if context_prefix:
