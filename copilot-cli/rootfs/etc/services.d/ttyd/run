@@ -581,6 +581,38 @@ them as background context in its conversations.
 - The assist integration writes entries with source=\\"assist\\"
 - The CLI should write entries with source=\\"cli\\"
 - Context is injected as background info, not system-level instructions
+
+## Entity/Area Cache (Fast Lookups)
+
+A SQLite cache of all HA entities, areas, and their states. Use this instead
+of making API calls to look up entity IDs, areas, or device info.
+
+\`\`\`bash
+# Refresh the cache (do this after adding new devices or areas)
+python3 /homeassistant/scripts/entity_cache.py refresh
+
+# Search for entities by name
+python3 /homeassistant/scripts/entity_cache.py query "kitchen light"
+
+# Filter by area and/or domain
+python3 /homeassistant/scripts/entity_cache.py query --area "living room"
+python3 /homeassistant/scripts/entity_cache.py query --domain cover
+python3 /homeassistant/scripts/entity_cache.py query --domain light --area office
+
+# List all areas with entity counts
+python3 /homeassistant/scripts/entity_cache.py areas
+
+# Stats overview
+python3 /homeassistant/scripts/entity_cache.py stats
+
+# JSON output for programmatic use
+python3 /homeassistant/scripts/entity_cache.py query "blind" --format json
+\`\`\`
+
+Cache DB: \`/homeassistant/.storage/entity_cache.db\`
+- Use \`query\` for fast entity lookups instead of calling the HA API
+- Run \`refresh\` after config changes or periodically
+- Supports searching by name, filtering by area and domain
 INSTREOF
 
 # Append Node-RED section if configured
