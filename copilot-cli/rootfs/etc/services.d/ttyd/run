@@ -539,6 +539,48 @@ This is a git clone of the GitHub repo that builds this add-on and the
 - Use `data.get(KEY, default)` — never `data[KEY]` for optional config
 - Guard `aiosqlite` imports with try/except ImportError
 - HA `ToolResultContent` uses `.tool_result` (NOT `.result`)
+
+## Shared Context (CLI ↔ Assist Integration)
+
+A shared SQLite-backed context system bridges the Copilot CLI and the
+ghcp_conversation assist integration. Both interfaces write conversation
+summaries to the same \`shared_context\` table in the analytics DB.
+
+### Reading Assist Context (what happened via voice/chat)
+
+\`\`\`bash
+# See recent assist conversations
+python3 /homeassistant/scripts/shared_context.py read
+
+# See last 20 entries from assist only
+python3 /homeassistant/scripts/shared_context.py read --source assist --limit 20
+
+# JSON output for programmatic use
+python3 /homeassistant/scripts/shared_context.py read --format json
+\`\`\`
+
+**Run this at the start of CLI sessions** to understand what the user has been
+doing via the assist integration. This provides continuity across interfaces.
+
+### Writing CLI Context (for assist to pick up)
+
+After completing significant tasks, write a summary so the assist integration
+knows what you did:
+
+\`\`\`bash
+python3 /homeassistant/scripts/shared_context.py write "Created motion automation" "Added automation motion_kitchen_light for kitchen motion sensor"
+\`\`\`
+
+The assist integration automatically reads recent CLI entries and includes
+them as background context in its conversations.
+
+### How It Works
+- Shared DB: \`/homeassistant/.storage/ghcp_conversation_analytics.db\`
+  (table: \`shared_context\`)
+- Entries auto-prune after 48 hours or 100 entries
+- The assist integration writes entries with source=\\"assist\\"
+- The CLI should write entries with source=\\"cli\\"
+- Context is injected as background info, not system-level instructions
 INSTREOF
 
 # Append Node-RED section if configured
