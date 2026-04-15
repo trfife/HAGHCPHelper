@@ -683,28 +683,26 @@ class GHCPConversationEntity(ConversationEntity):
                 trace.step("CLI: sending to Copilot CLI via ACP")
                 trace.model = "copilot-cli"
             result = await self._async_handle_acp(user_input, chat_log, data)
+            resp = _extract_response_text(result)
             if trace:
-                resp = _extract_response_text(result)
                 if resp:
                     trace.response_summary = resp[:500]
                 trace.step("CLI response received")
 
             # Store CLI fallback answer in knowledge when Azure failed
-            if azure_failed and analytics:
-                resp = _extract_response_text(result)
-                if resp and len(resp) > 10:
-                    await analytics.async_add_knowledge(
-                        query=user_input.text[:500],
-                        answer=resp[:1000],
-                        tags=["cli_fallback"],
-                        source="cli_fallback",
-                    )
-                    _LOGGER.info(
-                        "Stored CLI fallback response in knowledge store "
-                        "(prompt=%d chars, answer=%d chars)",
-                        len(user_input.text),
-                        len(resp),
-                    )
+            if azure_failed and analytics and resp and len(resp) > 10:
+                await analytics.async_add_knowledge(
+                    query=user_input.text[:500],
+                    answer=resp[:1000],
+                    tags=["cli_fallback"],
+                    source="cli_fallback",
+                )
+                _LOGGER.info(
+                    "Stored CLI fallback response in knowledge store "
+                    "(prompt=%d chars, answer=%d chars)",
+                    len(user_input.text),
+                    len(resp),
+                )
 
             return result
 
@@ -798,7 +796,10 @@ class GHCPConversationEntity(ConversationEntity):
                         len(knowledge_entries),
                     )
             except Exception:
-                _LOGGER.debug("Failed to search knowledge for Azure prompt")
+                _LOGGER.debug(
+                    "Failed to search knowledge for Azure prompt",
+                    exc_info=True,
+                )
 
         messages = self._build_messages(system_prompt, chat_log)
         tools = self._build_tools(chat_log)
