@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.4.0
+
+- **CLI fallback learning loop** — CLI responses are now captured in conversation traces and stored in the knowledge table so Azure can learn from common CLI-handled patterns
+- **Knowledge injection** — Azure fast path checks the knowledge store before making API calls, injecting relevant prior answers into the system prompt
+- **Auto-diagnose chat failures** — failures are pattern-matched against known error modes (Azure 400/401/429, CLI timeouts, tool errors) with auto-fix for safe cases
+- **Phone notifications on failure** — sends push notification via HA mobile app with diagnosis, auto-fix status, and link to logs
+- **Fix: tool_result serialization** — `_build_messages()` now stringifies dict tool results for Azure API compatibility (HA 2026+)
+- **Route tags** — `[HA]`/`[AZ]`/`[CLI]` prefixes on spoken responses for route visibility
+
 ## 3.3.0
 
 - **Shared context (CLI ↔ Assist)** — new cross-interface memory system so CLI sessions know what happened via voice/assist and vice versa

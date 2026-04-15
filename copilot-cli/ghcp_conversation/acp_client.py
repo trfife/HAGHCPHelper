@@ -18,7 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 
 ACP_PROTOCOL_VERSION = 1
 CLIENT_NAME = "ghcp_conversation"
-CLIENT_VERSION = "3.3.0"
+CLIENT_VERSION = "3.4.0"
 
 
 @dataclass
