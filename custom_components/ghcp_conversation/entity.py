@@ -171,6 +171,14 @@ def split_response_for_voice(content: str) -> tuple[str, str]:
     return (spoken, content.strip())
 
 
+def _extract_response_text(result: ConversationResult) -> str:
+    """Extract the plain speech text from a ConversationResult."""
+    if result.response and result.response.speech:
+        plain = result.response.speech.get("plain", {})
+        return plain.get("speech", "")
+    return ""
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -585,6 +593,8 @@ class GHCPConversationEntity(ConversationEntity):
             user_input.text[:80],
         )
 
+        azure_failed = False
+
         try:
             if decision.route == Route.LOCAL:
                 # ── Fast local path: use Azure for tool-calling ──────────
@@ -618,9 +628,15 @@ class GHCPConversationEntity(ConversationEntity):
                         trace.step("No Azure creds — falling back to CLI")
                         trace.route = Route.CLI.value
                         trace.model = "copilot-cli"
-                    return await self._async_handle_acp(
+                    result = await self._async_handle_acp(
                         user_input, chat_log, data
                     )
+                    if trace:
+                        resp = _extract_response_text(result)
+                        if resp:
+                            trace.response_summary = resp[:500]
+                        trace.step("CLI response received")
+                    return result
 
             if decision.route == Route.AZURE:
                 # ── Azure fast model for moderate queries ─────────────────
@@ -645,6 +661,7 @@ class GHCPConversationEntity(ConversationEntity):
                             trace.step("Azure response received")
                         return result
                     except Exception as err:
+                        azure_failed = True
                         _LOGGER.warning(
                             "Azure fast model failed, falling back to CLI: %s",
                             err,
@@ -666,8 +683,27 @@ class GHCPConversationEntity(ConversationEntity):
                 trace.step("CLI: sending to Copilot CLI via ACP")
                 trace.model = "copilot-cli"
             result = await self._async_handle_acp(user_input, chat_log, data)
+            resp = _extract_response_text(result)
             if trace:
+                if resp:
+                    trace.response_summary = resp[:500]
                 trace.step("CLI response received")
+
+            # Store CLI fallback answer in knowledge when Azure failed
+            if azure_failed and analytics and resp and len(resp) > 10:
+                await analytics.async_add_knowledge(
+                    query=user_input.text[:500],
+                    answer=resp[:1000],
+                    tags=["cli_fallback"],
+                    source="cli_fallback",
+                )
+                _LOGGER.info(
+                    "Stored CLI fallback response in knowledge store "
+                    "(prompt=%d chars, answer=%d chars)",
+                    len(user_input.text),
+                    len(resp),
+                )
+
             return result
 
         except Exception as err:
@@ -736,6 +772,34 @@ class GHCPConversationEntity(ConversationEntity):
         system_prompt = await self._async_enrich_with_shared_context(
             system_prompt, exclude_source="assist"
         )
+
+        # Inject relevant knowledge from prior CLI fallback answers
+        analytics = self.hass.data.get(DOMAIN, {}).get("analytics")
+        if analytics:
+            try:
+                knowledge_entries = await analytics.async_search_knowledge(
+                    user_input.text, limit=3
+                )
+                if knowledge_entries:
+                    knowledge_lines = []
+                    for entry in knowledge_entries:
+                        knowledge_lines.append(
+                            f"- Q: {entry['query']}\n  A: {entry['answer']}"
+                        )
+                    system_prompt += (
+                        "\n\n## Relevant Knowledge\n"
+                        "Previous answers for similar queries:\n"
+                        + "\n".join(knowledge_lines)
+                    )
+                    _LOGGER.debug(
+                        "Azure fast: injected %d knowledge entries",
+                        len(knowledge_entries),
+                    )
+            except Exception:
+                _LOGGER.debug(
+                    "Failed to search knowledge for Azure prompt",
+                    exc_info=True,
+                )
 
         messages = self._build_messages(system_prompt, chat_log)
         tools = self._build_tools(chat_log)
