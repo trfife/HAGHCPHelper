@@ -274,6 +274,55 @@ class AnalyticsStore:
             _LOGGER.exception("Failed to get traces")
             return []
 
+    async def async_get_recent_failures(
+        self, conversation_id: str = "", limit: int = 5, hours: int = 1
+    ) -> list[dict[str, Any]]:
+        """Return recent failed requests, optionally filtered by conversation_id."""
+        if not self._db:
+            return []
+        try:
+            cutoff = datetime.now(timezone.utc).isoformat()
+            if conversation_id:
+                cursor = await self._db.execute(
+                    """
+                    SELECT timestamp, user_prompt, route, model, error_msg
+                    FROM request_log
+                    WHERE success = 0
+                      AND timestamp >= datetime(?, '-' || ? || ' hours')
+                      AND user_prompt IN (
+                          SELECT user_prompt FROM conversation_trace
+                          WHERE conversation_id = ?
+                      )
+                    ORDER BY id DESC LIMIT ?
+                    """,
+                    (cutoff, hours, conversation_id, limit),
+                )
+            else:
+                cursor = await self._db.execute(
+                    """
+                    SELECT timestamp, user_prompt, route, model, error_msg
+                    FROM request_log
+                    WHERE success = 0
+                      AND timestamp >= datetime(?, '-' || ? || ' hours')
+                    ORDER BY id DESC LIMIT ?
+                    """,
+                    (cutoff, hours, limit),
+                )
+            rows = await cursor.fetchall()
+            return [
+                {
+                    "timestamp": r[0],
+                    "prompt": r[1],
+                    "route": r[2],
+                    "model": r[3],
+                    "error": r[4],
+                }
+                for r in rows
+            ]
+        except Exception:
+            _LOGGER.exception("Failed to get recent failures")
+            return []
+
     async def async_get_stats(
         self, hours: int = 24
     ) -> dict[str, Any]:

@@ -46,6 +46,7 @@ from .const import (
     CONF_ACP_HOST,
     CONF_ACP_PORT,
     CONF_AUTH_METHOD,
+    CONF_AUTO_FIX_ENABLED,
     CONF_AZURE_API_KEY,
     CONF_AZURE_ENDPOINT,
     CONF_AZURE_ROUTER_ENDPOINT,
@@ -56,14 +57,18 @@ from .const import (
     CONF_EMAIL_NOTIFY_SERVICE,
     CONF_EMAIL_THRESHOLD,
     CONF_EXPERT_MODEL,
+    CONF_FAILURE_NOTIFY_ENABLED,
+    CONF_FAILURE_NOTIFY_SERVICE,
     CONF_GITHUB_TOKEN,
     CONF_MAX_TOKENS,
     CONF_MODEL,
     CONF_PROMPT,
     CONF_TEMPERATURE,
+    DEFAULT_AUTO_FIX_ENABLED,
     DEFAULT_AZURE_ROUTER_MODEL,
     DEFAULT_EMAIL_MODE,
     DEFAULT_EMAIL_THRESHOLD,
+    DEFAULT_FAILURE_NOTIFY_ENABLED,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
     DEFAULT_PROMPT,
@@ -745,6 +750,46 @@ class GHCPOptionsFlow(OptionsFlow):
         ] = NumberSelector(
             NumberSelectorConfig(
                 min=100, max=10000, step=100, mode=NumberSelectorMode.BOX,
+            )
+        )
+
+        # Failure notification settings (available for all backends)
+        schema_dict[
+            vol.Optional(
+                CONF_FAILURE_NOTIFY_SERVICE,
+                default=merged.get(CONF_FAILURE_NOTIFY_SERVICE, ""),
+            )
+        ] = TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT))
+        schema_dict[
+            vol.Optional(
+                CONF_FAILURE_NOTIFY_ENABLED,
+                default=merged.get(
+                    CONF_FAILURE_NOTIFY_ENABLED, DEFAULT_FAILURE_NOTIFY_ENABLED
+                ),
+            )
+        ] = SelectSelector(
+            SelectSelectorConfig(
+                options=[
+                    {"value": "true", "label": "Enabled"},
+                    {"value": "false", "label": "Disabled"},
+                ],
+                mode=SelectSelectorMode.DROPDOWN,
+            )
+        )
+        schema_dict[
+            vol.Optional(
+                CONF_AUTO_FIX_ENABLED,
+                default=merged.get(
+                    CONF_AUTO_FIX_ENABLED, DEFAULT_AUTO_FIX_ENABLED
+                ),
+            )
+        ] = SelectSelector(
+            SelectSelectorConfig(
+                options=[
+                    {"value": "true", "label": "Enabled"},
+                    {"value": "false", "label": "Disabled"},
+                ],
+                mode=SelectSelectorMode.DROPDOWN,
             )
         )
 
