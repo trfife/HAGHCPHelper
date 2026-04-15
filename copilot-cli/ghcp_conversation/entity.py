@@ -274,16 +274,19 @@ class GHCPConversationEntity(ConversationEntity):
         self._last_thinking = ""
         self._last_full_response = ""
         self._last_route_trace: list[str] = []
+        self._last_route_tag: str = ""
 
         # ACP mode — forward prompt to Copilot CLI
         if backend == BACKEND_COPILOT_CLI:
             self._last_route_trace = [f"Backend: {backend} (direct ACP)"]
+            self._last_route_tag = "cli"
             result = await self._async_handle_acp(user_input, chat_log, data)
         # Hybrid mode — router decides: local → azure → cli fallback
         elif backend == BACKEND_HYBRID:
             result = await self._async_handle_hybrid(user_input, chat_log, data)
         else:
             self._last_route_trace = [f"Backend: {backend} (direct API)"]
+            self._last_route_tag = "azure"
             result = await self._async_handle_direct_api(user_input, chat_log, data)
 
         # Send email notification if configured
@@ -293,6 +296,20 @@ class GHCPConversationEntity(ConversationEntity):
         await self._async_write_shared_context(
             user_input.text, result, chat_log.conversation_id
         )
+
+        # Prefix the spoken response with a route tag for visibility
+        if self._last_route_tag and result.response and result.response.speech:
+            plain = result.response.speech.get("plain", {})
+            speech_text = plain.get("speech", "")
+            if speech_text:
+                tag_map = {
+                    "local": "[HA]",
+                    "azure": "[AZ]",
+                    "cli": "[CLI]",
+                }
+                tag = tag_map.get(self._last_route_tag, "")
+                if tag:
+                    result.response.async_set_speech(f"{tag} {speech_text}")
 
         return result
 
@@ -467,11 +484,15 @@ class GHCPConversationEntity(ConversationEntity):
                     "speech", ""
                 )
 
+            # Build tags from route info
+            tag = self._last_route_tag or "unknown"
+
             await analytics.async_append_shared_context(
                 source="assist",
                 prompt_summary=user_prompt,
                 response_summary=response_text or "",
                 conversation_id=conversation_id or "",
+                tags=tag,
             )
         except Exception:
             _LOGGER.debug("Shared context write failed (non-fatal)")
@@ -555,6 +576,8 @@ class GHCPConversationEntity(ConversationEntity):
             trace.route_confidence = decision.confidence
             trace.step(f"Router: {decision.route.value} (pattern={decision.matched_pattern}, conf={decision.confidence})")
 
+        self._last_route_tag = decision.route.value
+
         _LOGGER.info(
             "Hybrid router: route=%s pattern=%s prompt='%s'",
             decision.route.value,
@@ -587,6 +610,7 @@ class GHCPConversationEntity(ConversationEntity):
                 else:
                     # No Azure — fall through to CLI for LOCAL too
                     _LOGGER.debug("No Azure router, sending LOCAL to CLI")
+                    self._last_route_tag = "cli"
                     if metrics:
                         metrics.route = Route.CLI.value
                         metrics.model = "copilot-cli"
@@ -634,6 +658,7 @@ class GHCPConversationEntity(ConversationEntity):
                         trace.step("No Azure creds — using CLI")
 
             # ── CLI expert fallback (Route.CLI or Azure failed) ──────────
+            self._last_route_tag = "cli"
             if metrics:
                 metrics.route = Route.CLI.value
                 metrics.model = "copilot-cli"
@@ -924,14 +949,19 @@ class GHCPConversationEntity(ConversationEntity):
             elif isinstance(entry, AssistantContent):
                 if entry.content:
                     messages.append(
-                        {"role": "assistant", "content": entry.content}
+                        {"role": "assistant", "content": str(entry.content)}
                     )
             elif isinstance(entry, ToolResultContent):
+                # HA 2026+ stores tool_result as JsonObjectType (dict);
+                # Azure/OpenAI API requires content to be a string.
+                result = entry.tool_result
+                if not isinstance(result, str):
+                    result = json.dumps(result)
                 messages.append(
                     {
                         "role": "tool",
                         "tool_call_id": entry.tool_call_id,
-                        "content": entry.tool_result,
+                        "content": result,
                     }
                 )
 
