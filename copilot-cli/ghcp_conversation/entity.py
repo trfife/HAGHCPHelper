@@ -470,7 +470,7 @@ class GHCPConversationEntity(ConversationEntity):
 
     @staticmethod
     def _diagnose_failure(
-        error_msg: str, route: str, conversation_id: str = ""
+        error_msg: str, route: str
     ) -> tuple[str, str | None]:
         """Pattern-match an error and return (diagnosis, auto_fix_action | None).
 
@@ -545,7 +545,7 @@ class GHCPConversationEntity(ConversationEntity):
             service_name = service_name[len("notify."):]
 
         diagnosis, auto_fix = self._diagnose_failure(
-            error_msg, route, conversation_id
+            error_msg, route
         )
 
         # Apply safe auto-fix if enabled
