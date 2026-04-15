@@ -50,6 +50,7 @@ from .const import (
     BACKEND_HYBRID,
     CONF_ACP_HOST,
     CONF_ACP_PORT,
+    CONF_AUTO_FIX_ENABLED,
     CONF_AZURE_API_KEY,
     CONF_AZURE_ENDPOINT,
     CONF_AZURE_ROUTER_ENDPOINT,
@@ -60,14 +61,18 @@ from .const import (
     CONF_EMAIL_NOTIFY_SERVICE,
     CONF_EMAIL_THRESHOLD,
     CONF_EXPERT_MODEL,
+    CONF_FAILURE_NOTIFY_ENABLED,
+    CONF_FAILURE_NOTIFY_SERVICE,
     CONF_GITHUB_TOKEN,
     CONF_MAX_TOKENS,
     CONF_MODEL,
     CONF_PROMPT,
     CONF_TEMPERATURE,
+    DEFAULT_AUTO_FIX_ENABLED,
     DEFAULT_AZURE_ROUTER_MODEL,
     DEFAULT_EMAIL_MODE,
     DEFAULT_EMAIL_THRESHOLD,
+    DEFAULT_FAILURE_NOTIFY_ENABLED,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
     DEFAULT_PROMPT,
@@ -463,6 +468,173 @@ class GHCPConversationEntity(ConversationEntity):
                 exc_info=True,
             )
 
+    @staticmethod
+    def _diagnose_failure(
+        error_msg: str, route: str, conversation_id: str = ""
+    ) -> tuple[str, str | None]:
+        """Pattern-match an error and return (diagnosis, auto_fix_action | None).
+
+        Returns:
+            A 2-tuple of (human-readable diagnosis, auto-fix key or None).
+            auto-fix key is one of: "clear_conversation", "retry_fresh", "fallback_route", or None.
+        """
+        err = error_msg.lower()
+
+        # Azure 400 — invalid message content / corrupt history
+        if "400" in err or ("invalid" in err and ("message" in err or "content" in err)):
+            return (
+                "Azure returned 400 — likely invalid message format in "
+                "conversation history.",
+                "clear_conversation",
+            )
+
+        # Azure 401/403 — expired or invalid API key
+        if "401" in err or "authentication failed" in err:
+            return ("Azure authentication failed — API key may be expired.", None)
+        if "403" in err or "access denied" in err:
+            return ("Azure access denied — check API key permissions.", None)
+
+        # Azure 429 — rate limited
+        if "429" in err or "rate limit" in err:
+            return ("Azure rate limited — too many requests.", None)
+
+        # CLI / ACP errors
+        if "acp" in err or "copilot cli" in err or "couldn't reach" in err:
+            return (
+                "Copilot CLI (ACP) is unreachable — server may be down or overloaded.",
+                "retry_fresh",
+            )
+        if "timeout" in err or "timed out" in err:
+            return (
+                "Request timed out — the backend may be overloaded.",
+                "retry_fresh",
+            )
+
+        # Tool execution errors
+        if "entity not found" in err or "service not found" in err:
+            return (
+                "A tool execution failed — entity or service not found.",
+                None,
+            )
+
+        # Generic fallback
+        return (f"Unexpected error: {error_msg[:200]}", None)
+
+    async def _async_diagnose_and_notify(
+        self,
+        error_msg: str,
+        route: str,
+        user_prompt: str,
+        conversation_id: str,
+        data: dict[str, Any],
+    ) -> None:
+        """Diagnose a failure, optionally auto-fix, and send a notification."""
+        # Check if failure notifications are enabled
+        enabled = data.get(CONF_FAILURE_NOTIFY_ENABLED, DEFAULT_FAILURE_NOTIFY_ENABLED)
+        if isinstance(enabled, str):
+            enabled = enabled.lower() == "true"
+        if not enabled:
+            return
+
+        service_name = data.get(CONF_FAILURE_NOTIFY_SERVICE, "")
+        if not service_name:
+            return
+
+        # Normalize: accept "notify.foo" or just "foo"
+        if service_name.startswith("notify."):
+            service_name = service_name[len("notify."):]
+
+        diagnosis, auto_fix = self._diagnose_failure(
+            error_msg, route, conversation_id
+        )
+
+        # Apply safe auto-fix if enabled
+        auto_fix_raw = data.get(CONF_AUTO_FIX_ENABLED, DEFAULT_AUTO_FIX_ENABLED)
+        if isinstance(auto_fix_raw, str):
+            auto_fix_enabled = auto_fix_raw.lower() == "true"
+        else:
+            auto_fix_enabled = bool(auto_fix_raw)
+        fix_status = ""
+        if auto_fix and auto_fix_enabled:
+            if auto_fix == "clear_conversation":
+                self._acp_session_id = None
+                fix_status = "Auto-fix: cleared conversation state. Applied \u2705"
+            elif auto_fix == "retry_fresh":
+                self._acp_session_id = None
+                fix_status = "Auto-fix: reset session for fresh retry. Applied \u2705"
+            elif auto_fix == "fallback_route":
+                fix_status = "Auto-fix: will fallback to alternative route on next request. Applied \u2705"
+        elif auto_fix:
+            fix_status = f"Auto-fix available ({auto_fix}) but disabled in config."
+
+        # Check for repeated failures on same conversation
+        repeated_note = ""
+        try:
+            analytics: AnalyticsStore | None = self.hass.data.get(
+                DOMAIN, {}
+            ).get("analytics")
+            if analytics and conversation_id:
+                recent = await analytics.async_get_recent_failures(
+                    conversation_id=conversation_id, limit=5, hours=1
+                )
+                if len(recent) >= 2:
+                    repeated_note = (
+                        f"\u26a0\ufe0f Repeated failures ({len(recent)} in the "
+                        f"last hour) on this conversation — state may be corrupted."
+                    )
+                    if auto_fix_enabled:
+                        self._acp_session_id = None
+                        repeated_note += " Session reset applied."
+        except Exception:
+            _LOGGER.debug("Failed to check recent failures (non-fatal)")
+
+        # Build route label
+        route_label = {
+            "local": "Local (HA)",
+            "azure": "Azure API",
+            "cli": "Copilot CLI",
+        }.get(route, route or "Unknown")
+
+        title = f"\U0001f916 Assistant Error: {route_label} failed"
+
+        parts: list[str] = []
+        prompt_preview = user_prompt[:80]
+        if len(user_prompt) > 80:
+            prompt_preview += "\u2026"
+        parts.append(f'{diagnosis} on "{prompt_preview}"')
+        if fix_status:
+            parts.append(fix_status)
+        if repeated_note:
+            parts.append(repeated_note)
+
+        message = "\n".join(parts)
+
+        try:
+            await self.hass.services.async_call(
+                "notify",
+                service_name,
+                {
+                    "message": message,
+                    "title": title,
+                    "data": {
+                        "url": "/config/logs",
+                        "clickAction": "/config/logs",
+                    },
+                },
+                blocking=False,
+            )
+            _LOGGER.info(
+                "Failure notification sent via notify.%s for route=%s",
+                service_name,
+                route,
+            )
+        except Exception:
+            _LOGGER.warning(
+                "Failed to send failure notification via notify.%s",
+                service_name,
+                exc_info=True,
+            )
+
     async def _async_write_shared_context(
         self,
         user_prompt: str,
@@ -701,6 +873,15 @@ class GHCPConversationEntity(ConversationEntity):
                 await analytics.async_log(user_input.text, metrics)
             if analytics and trace:
                 await analytics.async_log_trace(trace)
+            # Diagnose and notify on hard failures
+            if metrics and not metrics.success:
+                await self._async_diagnose_and_notify(
+                    error_msg=metrics.error_msg,
+                    route=metrics.route,
+                    user_prompt=user_input.text,
+                    conversation_id=chat_log.conversation_id or "",
+                    data=data,
+                )
 
     async def _async_handle_azure_fast(
         self,
