@@ -48,6 +48,7 @@ from .const import (
     BACKEND_COPILOT_CLI,
     BACKEND_GITHUB,
     BACKEND_HYBRID,
+    BARNABEE_PROMPT,
     CONF_ACP_HOST,
     CONF_ACP_PORT,
     CONF_AUTO_FIX_ENABLED,
@@ -85,6 +86,7 @@ from .const import (
     KNOWLEDGE_TOOL_NAME,
     MAX_EMAIL_THINKING_CHARS,
     ORCHESTRATOR_PROMPT_SUFFIX,
+    SATELLITE_CONTEXT_TEMPLATE,
     SUBENTRY_TYPE_CONVERSATION,
     VOICE_DETAIL_SEPARATOR,
 )
@@ -243,6 +245,81 @@ class GHCPConversationEntity(ConversationEntity):
         if self._subentry:
             data.update(self._subentry.data)
         return data
+
+    def _resolve_system_prompt(self, data: dict[str, Any]) -> str:
+        """Select the right system prompt based on entity name and config.
+
+        Uses BARNABEE_PROMPT when the entity name contains 'barnabee'
+        (case-insensitive), otherwise falls back to the configured prompt
+        or DEFAULT_PROMPT.
+        """
+        configured = data.get(CONF_PROMPT, DEFAULT_PROMPT)
+        name = (self._attr_name or "").lower()
+        if "barnabee" in name:
+            return BARNABEE_PROMPT
+        return configured
+
+    def _get_device_context(
+        self,
+        user_input: ConversationInput,
+    ) -> str:
+        """Build device context string when request comes from a satellite.
+
+        Looks up the device in HA's device registry and returns the
+        SATELLITE_CONTEXT_TEMPLATE with area info if the device is found.
+        Returns empty string for non-satellite or unknown devices.
+        """
+        device_id = getattr(user_input, "device_id", None)
+        if not device_id:
+            return ""
+
+        try:
+            from homeassistant.helpers import device_registry as dr
+
+            dev_reg = dr.async_get(self.hass)
+            device = dev_reg.async_get(device_id)
+            if not device:
+                return ""
+
+            # Check if it's a satellite-like device (VACA, ESPHome, Wyoming)
+            is_satellite = False
+            for identifier in device.identifiers:
+                domain = identifier[0] if isinstance(identifier, tuple) else ""
+                if domain in (
+                    "vaca", "esphome", "wyoming", "assist_satellite",
+                ):
+                    is_satellite = True
+                    break
+            # Also treat it as satellite if the device has an
+            # assist_satellite entity (covers any integration)
+            if not is_satellite:
+                from homeassistant.helpers import entity_registry as er
+
+                ent_reg = er.async_get(self.hass)
+                for entry in er.async_entries_for_device(ent_reg, device_id):
+                    if entry.domain == "assist_satellite":
+                        is_satellite = True
+                        break
+
+            if not is_satellite:
+                return ""
+
+            area_info = ""
+            if device.area_id:
+                from homeassistant.helpers import area_registry as ar
+
+                area_reg = ar.async_get(self.hass)
+                area = area_reg.async_get_area(device.area_id)
+                if area:
+                    area_info = f" in the {area.name}"
+
+            return SATELLITE_CONTEXT_TEMPLATE.format(area_info=area_info)
+        except Exception:
+            _LOGGER.debug(
+                "Failed to resolve device context for %s", device_id,
+                exc_info=True,
+            )
+            return ""
 
     def _get_client(self, session: aiohttp.ClientSession) -> ChatCompletionClient:
         """Build the API client from current config."""
@@ -931,7 +1008,7 @@ class GHCPConversationEntity(ConversationEntity):
         """Handle a request through the Azure AI Foundry fast model."""
         temperature = data.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE)
         max_tokens = int(data.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS))
-        system_prompt = data.get(CONF_PROMPT, DEFAULT_PROMPT)
+        system_prompt = self._resolve_system_prompt(data)
 
         _LOGGER.debug(
             "Azure fast: endpoint=%s model=%s prompt='%s'",
@@ -948,6 +1025,12 @@ class GHCPConversationEntity(ConversationEntity):
         )
         if chat_log.llm_api:
             system_prompt = chat_log.llm_api.api_prompt
+
+        # Inject satellite device context (area awareness)
+        device_context = self._get_device_context(user_input)
+        if device_context:
+            system_prompt += device_context
+            _LOGGER.debug("Azure fast: injected device context")
 
         # Inject cross-interface context (CLI activity) into system prompt
         system_prompt = await self._async_enrich_with_shared_context(
@@ -1072,7 +1155,7 @@ class GHCPConversationEntity(ConversationEntity):
         model = data.get(CONF_MODEL, DEFAULT_MODEL)
         temperature = data.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE)
         max_tokens = int(data.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS))
-        system_prompt = data.get(CONF_PROMPT, DEFAULT_PROMPT)
+        system_prompt = self._resolve_system_prompt(data)
         expert_model = data.get(CONF_EXPERT_MODEL, "")
 
         # Provide HA LLM tools to the chat log
@@ -1087,6 +1170,11 @@ class GHCPConversationEntity(ConversationEntity):
         # Use the chat_log's generated prompt if available
         if chat_log.llm_api:
             system_prompt = chat_log.llm_api.api_prompt
+
+        # Inject satellite device context (area awareness)
+        device_context = self._get_device_context(user_input)
+        if device_context:
+            system_prompt += device_context
 
         # Append orchestrator instructions when expert model is configured
         if expert_model:
