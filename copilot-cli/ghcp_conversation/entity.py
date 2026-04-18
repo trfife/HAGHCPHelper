@@ -1018,7 +1018,7 @@ class GHCPConversationEntity(ConversationEntity):
             user_input.extra_system_prompt,
         )
         if chat_log.llm_api:
-            system_prompt = chat_log.llm_api.api_prompt
+            system_prompt = chat_log.llm_api.api_prompt + "\n\n" + system_prompt
 
         # Inject satellite device context (area awareness)
         device_context = self._get_device_context(user_input)
@@ -1163,7 +1163,7 @@ class GHCPConversationEntity(ConversationEntity):
         )
         # Use the chat_log's generated prompt if available
         if chat_log.llm_api:
-            system_prompt = chat_log.llm_api.api_prompt
+            system_prompt = chat_log.llm_api.api_prompt + "\n\n" + system_prompt
 
         # Inject satellite device context (area awareness)
         device_context = self._get_device_context(user_input)
