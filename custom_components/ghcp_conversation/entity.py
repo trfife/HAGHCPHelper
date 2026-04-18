@@ -774,21 +774,31 @@ class GHCPConversationEntity(ConversationEntity):
                 router_key = data.get(CONF_AZURE_ROUTER_KEY)
 
                 if router_endpoint and router_key:
-                    router_model = data.get(
-                        CONF_AZURE_ROUTER_MODEL, DEFAULT_AZURE_ROUTER_MODEL
-                    )
-                    if metrics:
-                        metrics.model = router_model
-                    if trace:
-                        trace.model = router_model
-                        trace.step(f"LOCAL→Azure: using {router_model}")
-                    result = await self._async_handle_azure_fast(
-                        user_input, chat_log, data,
-                        router_endpoint, router_key, router_model,
-                    )
-                    if trace:
-                        trace.step("Azure response received")
-                    return result
+                    try:
+                        router_model = data.get(
+                            CONF_AZURE_ROUTER_MODEL, DEFAULT_AZURE_ROUTER_MODEL
+                        )
+                        if metrics:
+                            metrics.model = router_model
+                        if trace:
+                            trace.model = router_model
+                            trace.step(f"LOCAL→Azure: using {router_model}")
+                        result = await self._async_handle_azure_fast(
+                            user_input, chat_log, data,
+                            router_endpoint, router_key, router_model,
+                        )
+                        if trace:
+                            trace.step("Azure response received")
+                        return result
+                    except Exception as err:
+                        azure_failed = True
+                        _LOGGER.warning(
+                            "Azure fast model failed on LOCAL route, falling back to CLI: %s",
+                            err,
+                        )
+                        if trace:
+                            trace.step(f"Azure FAILED on LOCAL: {err} — falling back to CLI")
+                        # Fall through to CLI
                 else:
                     # No Azure — fall through to CLI for LOCAL too
                     _LOGGER.debug("No Azure router, sending LOCAL to CLI")
