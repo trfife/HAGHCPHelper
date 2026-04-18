@@ -35,6 +35,46 @@ class RouteDecision:
 #   2. CLI patterns    – complex tasks that need the full Copilot agent
 #   3. Everything else – moderate queries routed to Azure fast model
 
+# Display/navigation patterns — need LLM interpretation, route to AZURE.
+# Checked BEFORE LOCAL to prevent false matches on "show me" state queries.
+_AZURE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    # Camera / video feed display
+    (re.compile(
+        r"\b(show|display|pull up|bring up|view|stream|watch)\b.+"
+        r"\b(camera|cam|feed|video|stream|doorbell|ring)\b",
+        re.IGNORECASE,
+    ), "display_camera"),
+
+    # Dashboard / page navigation
+    (re.compile(
+        r"\b(go\s+to|navigate\s+to|open|show|switch\s+to|display)\b.+"
+        r"\b(dashboard|page|view|screen|panel|tab|home\s*screen|main\s*screen)\b",
+        re.IGNORECASE,
+    ), "navigate_dashboard"),
+
+    # Screen control
+    (re.compile(
+        r"\b(go\s+back|go\s+home|show\s+(?:the\s+)?(?:home|main|default)\s+"
+        r"(?:screen|page|dashboard|view))\b",
+        re.IGNORECASE,
+    ), "screen_control"),
+
+    # Media playback on display
+    (re.compile(
+        r"\b(play|show|display|cast|put on)\b.+"
+        r"\b(photo|picture|image|album|slideshow|music|song|playlist|video|movie|"
+        r"tv|youtube|spotify)\b",
+        re.IGNORECASE,
+    ), "media_display"),
+
+    # Announcement / intercom (needs LLM to compose message)
+    (re.compile(
+        r"\b(announce|announcement|broadcast|intercom|tell\s+(?:the|everyone)|"
+        r"drop\s+in)\b",
+        re.IGNORECASE,
+    ), "announcement"),
+]
+
 _LOCAL_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # Direct device control
     (re.compile(
@@ -137,7 +177,15 @@ def classify_intent(prompt: str) -> RouteDecision:
     if not text:
         return RouteDecision(route=Route.AZURE, confidence=0.0)
 
-    # 1. Check LOCAL patterns — deterministic device control
+    # 1. Check AZURE display/navigation patterns first — prevent LOCAL false matches
+    for pattern, label in _AZURE_PATTERNS:
+        if pattern.search(text):
+            _LOGGER.debug("Router: AZURE match '%s' for: %s", label, text[:80])
+            return RouteDecision(
+                route=Route.AZURE, confidence=0.9, matched_pattern=label
+            )
+
+    # 2. Check LOCAL patterns — deterministic device control
     for pattern, label in _LOCAL_PATTERNS:
         if pattern.search(text):
             _LOGGER.debug("Router: LOCAL match '%s' for: %s", label, text[:80])
@@ -145,7 +193,7 @@ def classify_intent(prompt: str) -> RouteDecision:
                 route=Route.LOCAL, confidence=0.9, matched_pattern=label
             )
 
-    # 2. Check CLI patterns — complex tasks
+    # 3. Check CLI patterns — complex tasks
     for pattern, label in _CLI_PATTERNS:
         if pattern.search(text):
             _LOGGER.debug("Router: CLI match '%s' for: %s", label, text[:80])
@@ -153,7 +201,7 @@ def classify_intent(prompt: str) -> RouteDecision:
                 route=Route.CLI, confidence=0.85, matched_pattern=label
             )
 
-    # 3. Default — Azure fast model for everything else
+    # 4. Default — Azure fast model for everything else
     _LOGGER.debug("Router: AZURE (default) for: %s", text[:80])
     return RouteDecision(
         route=Route.AZURE, confidence=0.5, matched_pattern="default"
