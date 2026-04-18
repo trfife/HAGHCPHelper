@@ -131,6 +131,29 @@ _EMOJI_RE = re.compile(
 )
 
 
+# Patterns that indicate Azure is deflecting / can't handle the request
+_DEFLECTION_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"\b(?:i (?:can't|cannot|don't have (?:the ability|access)|am (?:not able|unable)|lack the ability))\b", re.IGNORECASE),
+    re.compile(r"\b(?:i'm (?:not able|unable|sorry.{0,20}(?:can't|cannot|don't have)))\b", re.IGNORECASE),
+    re.compile(r"\b(?:beyond (?:my|what i can)|outside (?:my|the scope of))\b", re.IGNORECASE),
+    re.compile(r"\b(?:you (?:would need to|should|might want to|could try|may need to) (?:ask|use|contact|check|consult))\b", re.IGNORECASE),
+    re.compile(r"\b(?:(?:not|don't) have (?:direct )?access to (?:your|the|that))\b", re.IGNORECASE),
+    re.compile(r"\b(?:requires? (?:direct|file|ssh|terminal|shell|cli) access)\b", re.IGNORECASE),
+    re.compile(r"\b(?:(?:can't|cannot) (?:directly )?(?:edit|modify|create|write|read|access|manage|configure) (?:files?|config|yaml|dashboard))\b", re.IGNORECASE),
+    re.compile(r"\b(?:(?:don't|do not) have (?:the )?(?:tools?|capability|means) to)\b", re.IGNORECASE),
+]
+
+
+def _is_deflection(response_text: str) -> bool:
+    """Return True if the Azure response indicates it can't handle the request."""
+    if not response_text or len(response_text) < 15:
+        return False
+    for pattern in _DEFLECTION_PATTERNS:
+        if pattern.search(response_text):
+            return True
+    return False
+
+
 def _sanitize_for_tts(text: str) -> str:
     """Remove emojis and ensure text isn't empty after ElevenLabs tag stripping."""
     # Strip emojis
@@ -888,7 +911,18 @@ class GHCPConversationEntity(ConversationEntity):
                         )
                         if trace:
                             trace.step("Azure response received")
-                        return result
+                        # Check if Azure deflected
+                        resp_text = _extract_response_text(result)
+                        if _is_deflection(resp_text):
+                            _LOGGER.info(
+                                "Azure deflected on LOCAL route, escalating to CLI: %s",
+                                resp_text[:120],
+                            )
+                            if trace:
+                                trace.step(f"Azure DEFLECTED: '{resp_text[:80]}' — escalating to CLI")
+                            # Fall through to CLI
+                        else:
+                            return result
                     except Exception as err:
                         azure_failed = True
                         _LOGGER.warning(
@@ -940,7 +974,19 @@ class GHCPConversationEntity(ConversationEntity):
                         )
                         if trace:
                             trace.step("Azure response received")
-                        return result
+                        # Check if Azure deflected
+                        resp_text = _extract_response_text(result)
+                        if _is_deflection(resp_text):
+                            azure_failed = True
+                            _LOGGER.info(
+                                "Azure deflected, escalating to CLI: %s",
+                                resp_text[:120],
+                            )
+                            if trace:
+                                trace.step(f"Azure DEFLECTED: '{resp_text[:80]}' — escalating to CLI")
+                            # Fall through to CLI
+                        else:
+                            return result
                     except Exception as err:
                         azure_failed = True
                         _LOGGER.warning(
