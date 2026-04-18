@@ -89,6 +89,7 @@ from .const import (
     SATELLITE_CONTEXT_TEMPLATE,
     SUBENTRY_TYPE_CONVERSATION,
     VOICE_DETAIL_SEPARATOR,
+    FAMILY_FRIENDLY_SUFFIX,
 )
 from .router import Route, classify_intent
 
@@ -1110,6 +1111,9 @@ class GHCPConversationEntity(ConversationEntity):
             system_prompt += device_context
             _LOGGER.debug("Azure fast: injected device context")
 
+        # Always append family-friendly rules (after HA override so they stick)
+        system_prompt += FAMILY_FRIENDLY_SUFFIX
+
         # Inject cross-interface context (CLI activity) into system prompt
         system_prompt = await self._async_enrich_with_shared_context(
             system_prompt, exclude_source="assist"
@@ -1253,6 +1257,9 @@ class GHCPConversationEntity(ConversationEntity):
         device_context = self._get_device_context(user_input)
         if device_context:
             system_prompt += device_context
+
+        # Always append family-friendly rules (after HA override so they stick)
+        system_prompt += FAMILY_FRIENDLY_SUFFIX
 
         # Append orchestrator instructions when expert model is configured
         if expert_model:
