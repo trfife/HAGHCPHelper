@@ -247,17 +247,11 @@ class GHCPConversationEntity(ConversationEntity):
         return data
 
     def _resolve_system_prompt(self, data: dict[str, Any]) -> str:
-        """Select the right system prompt based on entity name and config.
+        """Select the system prompt for conversation requests.
 
-        Uses BARNABEE_PROMPT when the entity name contains 'barnabee'
-        (case-insensitive), otherwise falls back to the configured prompt
-        or DEFAULT_PROMPT.
+        Always uses BARNABEE_PROMPT as the base personality.
         """
-        configured = data.get(CONF_PROMPT, DEFAULT_PROMPT)
-        name = (self._attr_name or "").lower()
-        if "barnabee" in name:
-            return BARNABEE_PROMPT
-        return configured
+        return BARNABEE_PROMPT
 
     def _get_device_context(
         self,
