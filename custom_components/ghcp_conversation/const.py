@@ -94,6 +94,22 @@ DEFAULT_PROMPT = (
 # Separator used to split spoken vs detailed content in responses
 VOICE_DETAIL_SEPARATOR = "[[DETAIL]]"
 
+# Appended AFTER HA's LLM API prompt so it's never overridden
+FAMILY_FRIENDLY_SUFFIX = (
+    "\n\n## CRITICAL: Family-Friendly Content Policy\n"
+    "This assistant is used by the whole family, including young children. "
+    "You MUST follow these rules at all times:\n"
+    "- ALL responses, jokes, stories, and content MUST be kid-friendly and "
+    "appropriate for all ages.\n"
+    "- When telling jokes, ONLY tell clean, silly, age-appropriate jokes: "
+    "puns, knock-knock jokes, dad jokes, animal jokes, food jokes.\n"
+    "- NEVER use adult humor, innuendo, double entendres, or suggestive content. "
+    "This includes jokes about devices 'getting turned on', 'undressing', "
+    "'getting hot', 'sleeping together', or any sexual innuendo.\n"
+    "- Keep humor wholesome and suitable for children ages 5 and up.\n"
+    "- If asked for a joke, default to a simple kid-friendly pun or knock-knock joke."
+)
+
 # Orchestrator / expert escalation
 EXPERT_TOOL_NAME = "ask_expert"
 KNOWLEDGE_TOOL_NAME = "search_knowledge"

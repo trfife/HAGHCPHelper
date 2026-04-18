@@ -87,6 +87,7 @@ from .const import (
     ORCHESTRATOR_PROMPT_SUFFIX,
     SUBENTRY_TYPE_CONVERSATION,
     VOICE_DETAIL_SEPARATOR,
+    FAMILY_FRIENDLY_SUFFIX,
 )
 from .router import Route, classify_intent
 
@@ -1005,6 +1006,9 @@ class GHCPConversationEntity(ConversationEntity):
         if chat_log.llm_api:
             system_prompt = chat_log.llm_api.api_prompt
 
+        # Always append family-friendly rules (after HA override so they stick)
+        system_prompt += FAMILY_FRIENDLY_SUFFIX
+
         # Inject cross-interface context (CLI activity) into system prompt
         system_prompt = await self._async_enrich_with_shared_context(
             system_prompt, exclude_source="assist"
@@ -1143,6 +1147,9 @@ class GHCPConversationEntity(ConversationEntity):
         # Use the chat_log's generated prompt if available
         if chat_log.llm_api:
             system_prompt = chat_log.llm_api.api_prompt
+
+        # Always append family-friendly rules (after HA override so they stick)
+        system_prompt += FAMILY_FRIENDLY_SUFFIX
 
         # Append orchestrator instructions when expert model is configured
         if expert_model:
