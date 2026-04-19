@@ -861,6 +861,65 @@ class GHCPConversationEntity(ConversationEntity):
             + "\nTell a DIFFERENT joke you haven't told recently."
         )
 
+    async def _async_get_shopping_list_contents(self) -> str:
+        """Fetch current shopping list items and format for prompt injection."""
+        try:
+            # Access shopping list data through HA's internal data store
+            sl_data = self.hass.data.get("shopping_list")
+            if sl_data is not None:
+                items = sl_data.items
+                if not items:
+                    return "\n\n## Current Shopping List\nThe shopping list is empty."
+                incomplete = [i["name"] for i in items if not i.get("complete")]
+                completed = [i["name"] for i in items if i.get("complete")]
+                parts = ["\n\n## Current Shopping List"]
+                if incomplete:
+                    parts.append(
+                        f"Items ({len(incomplete)}): " + ", ".join(incomplete)
+                    )
+                else:
+                    parts.append("No unchecked items.")
+                if completed:
+                    parts.append(
+                        f"Checked off ({len(completed)}): "
+                        + ", ".join(completed)
+                    )
+                return "\n".join(parts)
+
+            # Fallback: try Supervisor API
+            import os
+
+            token = os.environ.get("SUPERVISOR_TOKEN", "")
+            if not token:
+                return ""
+            session = async_get_clientsession(self.hass)
+            resp = await session.get(
+                "http://supervisor/core/api/shopping_list",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=aiohttp.ClientTimeout(total=5),
+            )
+            items = await resp.json()
+            if not items:
+                return "\n\n## Current Shopping List\nThe shopping list is empty."
+            incomplete = [i["name"] for i in items if not i.get("complete")]
+            completed = [i["name"] for i in items if i.get("complete")]
+            parts = ["\n\n## Current Shopping List"]
+            if incomplete:
+                parts.append(
+                    f"Items ({len(incomplete)}): " + ", ".join(incomplete)
+                )
+            else:
+                parts.append("No unchecked items.")
+            if completed:
+                parts.append(
+                    f"Checked off ({len(completed)}): "
+                    + ", ".join(completed)
+                )
+            return "\n".join(parts)
+        except Exception:
+            _LOGGER.debug("Failed to fetch shopping list contents")
+            return ""
+
     async def _async_maybe_log_joke(self, response_text: str) -> None:
         """If the response looks like a joke, log it."""
         analytics: AnalyticsStore | None = self.hass.data.get(
@@ -1438,6 +1497,14 @@ class GHCPConversationEntity(ConversationEntity):
         # Add shopping list guidance so Azure knows the service calls
         system_prompt += SHOPPING_LIST_GUIDANCE
 
+        # If user is asking about the shopping list, inject current items
+        if re.search(
+            r"\b(what'?s|show|read|what\s+is|list)\b.+\b(shopping\s*list|grocery\s*list)\b",
+            user_input.text,
+            re.IGNORECASE,
+        ):
+            system_prompt += await self._async_get_shopping_list_contents()
+
         # Inject joke exclusions when user asks for a joke
         if self._is_joke_request(user_input.text):
             joke_exclusions = await self._async_get_joke_exclusions()
@@ -1599,6 +1666,14 @@ class GHCPConversationEntity(ConversationEntity):
 
         # Add shopping list guidance so the model knows the service calls
         system_prompt += SHOPPING_LIST_GUIDANCE
+
+        # If user is asking about the shopping list, inject current items
+        if re.search(
+            r"\b(what'?s|show|read|what\s+is|list)\b.+\b(shopping\s*list|grocery\s*list)\b",
+            user_input.text,
+            re.IGNORECASE,
+        ):
+            system_prompt += await self._async_get_shopping_list_contents()
 
         # Inject joke exclusions when user asks for a joke
         if self._is_joke_request(user_input.text):
