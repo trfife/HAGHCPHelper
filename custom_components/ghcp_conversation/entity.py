@@ -1176,7 +1176,7 @@ class GHCPConversationEntity(ConversationEntity):
                     conversation_id=user_input.conversation_id,
                     context=user_input.context,
                     language=user_input.language,
-                    agent_id="homeassistant",
+                    agent_id="conversation.home_assistant",
                     device_id=getattr(user_input, "device_id", None),
                     satellite_id=getattr(user_input, "satellite_id", None),
                 )
