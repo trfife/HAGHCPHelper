@@ -414,6 +414,15 @@ class GHCPConversationEntity(ConversationEntity):
                 if tag:
                     result.response.async_set_speech(f"{tag} {speech_text}")
 
+        # Check for [[LISTEN]] marker — keep mic open for follow-up
+        if result.response and result.response.speech:
+            plain = result.response.speech.get("plain", {})
+            speech_text = plain.get("speech", "")
+            if "[[LISTEN]]" in speech_text:
+                speech_text = speech_text.replace("[[LISTEN]]", "").strip()
+                result.response.async_set_speech(speech_text)
+                result.continue_conversation = True
+
         return result
 
     async def _async_handle_acp(
