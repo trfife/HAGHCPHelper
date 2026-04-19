@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.5.0
+
+- **Notion conversation logging** — conversation logs now go to a Notion database instead of email. Configurable modes: Always, Long responses only, Failures only, or Off. Full response and routing trace stored as page body blocks. Email logging kept as legacy fallback.
+- **Joke de-duplication** — tracks recently told jokes in SQLite. When a joke is requested, recent jokes are injected into the system prompt as exclusions so the LLM tells a different joke each time.
+- **Shopping list support** — added shopping list management guidance to the system prompt so the Azure model knows how to call `shopping_list.*` and `todo.*` services. "Clear my shopping list" now works via `complete_all` + `clear_completed_items`. Added shopping list patterns to the intent router for reliable LOCAL routing.
+- **Improved CLI escalation** — broadened deflection detection patterns to catch more Azure "I can't do that" phrasings (6 new patterns). Requests that Azure deflects on are now more reliably escalated to CLI.
+- **Router improvements** — added shopping list and grocery list patterns to LOCAL route so they reliably go to Azure with HA tools instead of defaulting to CLI.
+
 ## 3.4.0
 
 - **CLI fallback learning loop** — CLI responses are now captured in conversation traces and stored in the knowledge table so Azure can learn from common CLI-handled patterns

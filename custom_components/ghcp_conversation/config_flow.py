@@ -62,6 +62,9 @@ from .const import (
     CONF_GITHUB_TOKEN,
     CONF_MAX_TOKENS,
     CONF_MODEL,
+    CONF_NOTION_DB_ID,
+    CONF_NOTION_LOG_MODE,
+    CONF_NOTION_TOKEN,
     CONF_PROMPT,
     CONF_TEMPERATURE,
     DEFAULT_AUTO_FIX_ENABLED,
@@ -71,6 +74,7 @@ from .const import (
     DEFAULT_FAILURE_NOTIFY_ENABLED,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
+    DEFAULT_NOTION_LOG_MODE,
     DEFAULT_PROMPT,
     DEFAULT_TEMPERATURE,
     DOMAIN,
@@ -79,6 +83,10 @@ from .const import (
     EMAIL_MODE_OFF,
     FALLBACK_MODELS,
     GITHUB_OAUTH_CLIENT_ID,
+    NOTION_LOG_MODE_ALWAYS,
+    NOTION_LOG_MODE_FAILURES,
+    NOTION_LOG_MODE_LONG_ONLY,
+    NOTION_LOG_MODE_OFF,
     SUBENTRY_TYPE_CONVERSATION,
 )
 from .github_auth import (
@@ -720,7 +728,37 @@ class GHCPOptionsFlow(OptionsFlow):
                 )
             ] = TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT))
 
-        # Email notification settings (available for all backends)
+        # Notion logging settings (preferred over email)
+        schema_dict[
+            vol.Optional(
+                CONF_NOTION_TOKEN,
+                default=merged.get(CONF_NOTION_TOKEN, ""),
+            )
+        ] = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD))
+        schema_dict[
+            vol.Optional(
+                CONF_NOTION_DB_ID,
+                default=merged.get(CONF_NOTION_DB_ID, ""),
+            )
+        ] = TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT))
+        schema_dict[
+            vol.Optional(
+                CONF_NOTION_LOG_MODE,
+                default=merged.get(CONF_NOTION_LOG_MODE, DEFAULT_NOTION_LOG_MODE),
+            )
+        ] = SelectSelector(
+            SelectSelectorConfig(
+                options=[
+                    {"value": NOTION_LOG_MODE_OFF, "label": "Off"},
+                    {"value": NOTION_LOG_MODE_ALWAYS, "label": "Always"},
+                    {"value": NOTION_LOG_MODE_LONG_ONLY, "label": "Long responses only"},
+                    {"value": NOTION_LOG_MODE_FAILURES, "label": "Failures only"},
+                ],
+                mode=SelectSelectorMode.DROPDOWN,
+            )
+        )
+
+        # Email notification settings (legacy — kept for backward compat)
         schema_dict[
             vol.Optional(
                 CONF_EMAIL_NOTIFY_SERVICE,
