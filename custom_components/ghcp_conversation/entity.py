@@ -25,6 +25,7 @@ from homeassistant.const import CONF_LLM_HASS_API
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import intent, llm
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 try:
@@ -70,6 +71,7 @@ from .const import (
     CONF_NOTION_DB_ID,
     CONF_NOTION_LOG_MODE,
     CONF_SHOW_ROUTE_TAG,
+    CONF_VOICE_CONCISENESS,
     CONF_NOTION_TOKEN,
     CONF_PROMPT,
     CONF_TEMPERATURE,
@@ -104,6 +106,7 @@ from .const import (
     SATELLITE_CONTEXT_TEMPLATE,
     SHOPPING_LIST_GUIDANCE,
     SUBENTRY_TYPE_CONVERSATION,
+    VOICE_CONCISE_SUFFIX,
     VOICE_DETAIL_SEPARATOR,
     FAMILY_FRIENDLY_SUFFIX,
 )
@@ -438,15 +441,24 @@ class GHCPConversationEntity(ConversationEntity):
             self._last_route_tag = "azure"
             result = await self._async_handle_direct_api(user_input, chat_log, data)
 
-        # Send email notification if configured (legacy)
-        await self._async_maybe_send_email(user_input.text, result, data)
+        # ── Post-response processing ────────────────────────────────────
+        # Snapshot mutable per-turn state BEFORE backgrounding any tasks
+        _prompt_text = user_input.text
+        _route_tag = self._last_route_tag
+        _full_response = self._last_full_response
+        _data = dict(data)  # shallow copy — options don't mutate mid-turn
 
-        # Log to Notion if configured (preferred over email)
-        await self._async_maybe_log_to_notion(user_input.text, result, data)
+        # Fire-and-forget: email & Notion logging (external I/O, non-critical)
+        self.hass.async_create_task(
+            self._async_maybe_send_email(_prompt_text, result, _data)
+        )
+        self.hass.async_create_task(
+            self._async_maybe_log_to_notion(_prompt_text, result, _data)
+        )
 
-        # Track jokes for de-duplication
-        if self._is_joke_request(user_input.text):
-            response_text = self._last_full_response or ""
+        # Serial: joke tracking & shared context (affect future turns)
+        if self._is_joke_request(_prompt_text):
+            response_text = _full_response or ""
             if not response_text and result.response and result.response.speech:
                 response_text = result.response.speech.get("plain", {}).get(
                     "speech", ""
@@ -454,9 +466,8 @@ class GHCPConversationEntity(ConversationEntity):
             if response_text:
                 await self._async_maybe_log_joke(response_text)
 
-        # Write to shared context for cross-interface memory
         await self._async_write_shared_context(
-            user_input.text, result, chat_log.conversation_id
+            _prompt_text, result, chat_log.conversation_id
         )
 
         # Prefix the spoken response with a route tag for visibility
@@ -794,20 +805,20 @@ class GHCPConversationEntity(ConversationEntity):
             payload["children"] = children[:100]  # Notion limit
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{NOTION_API_URL}/pages",
-                    headers=headers,
-                    json=payload,
-                    timeout=aiohttp.ClientTimeout(total=15),
-                ) as resp:
-                    if resp.status == 200:
-                        _LOGGER.info("Notion log created for: %s", title)
-                    else:
-                        body = await resp.text()
-                        _LOGGER.warning(
-                            "Notion API error %d: %s", resp.status, body[:200]
-                        )
+            session = async_get_clientsession(self.hass)
+            async with session.post(
+                f"{NOTION_API_URL}/pages",
+                headers=headers,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as resp:
+                if resp.status == 200:
+                    _LOGGER.info("Notion log created for: %s", title)
+                else:
+                    body = await resp.text()
+                    _LOGGER.warning(
+                        "Notion API error %d: %s", resp.status, body[:200]
+                    )
         except Exception:
             _LOGGER.warning("Failed to log to Notion", exc_info=True)
 
@@ -1407,6 +1418,12 @@ class GHCPConversationEntity(ConversationEntity):
         # Always append family-friendly rules (after HA override so they stick)
         system_prompt += FAMILY_FRIENDLY_SUFFIX
 
+        # Voice conciseness: reinforce brevity when request comes from a satellite
+        if data.get(CONF_VOICE_CONCISENESS, True) and getattr(
+            user_input, "satellite_id", None
+        ):
+            system_prompt += VOICE_CONCISE_SUFFIX
+
         # Add shopping list guidance so Azure knows the service calls
         system_prompt += SHOPPING_LIST_GUIDANCE
 
@@ -1459,61 +1476,61 @@ class GHCPConversationEntity(ConversationEntity):
             len(system_prompt),
         )
 
-        async with aiohttp.ClientSession() as session:
-            client = build_azure_client(session, endpoint, api_key, model=model)
+        session = async_get_clientsession(self.hass)
+        client = build_azure_client(session, endpoint, api_key, model=model)
 
-            for _iteration in range(MAX_TOOL_ITERATIONS):
-                _LOGGER.debug("Azure fast: iteration %d", _iteration + 1)
-                response = await client.async_chat_completion(
-                    model=model,
-                    messages=messages,
-                    tools=tools or None,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
+        for _iteration in range(MAX_TOOL_ITERATIONS):
+            _LOGGER.debug("Azure fast: iteration %d", _iteration + 1)
+            response = await client.async_chat_completion(
+                model=model,
+                messages=messages,
+                tools=tools or None,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+
+            choice = response.get("choices", [{}])[0]
+            message = choice.get("message", {})
+            content = message.get("content", "")
+            tool_calls = message.get("tool_calls")
+
+            if not tool_calls:
+                _LOGGER.info(
+                    "Azure fast: final response %d chars",
+                    len(content),
                 )
+                break
 
-                choice = response.get("choices", [{}])[0]
-                message = choice.get("message", {})
-                content = message.get("content", "")
-                tool_calls = message.get("tool_calls")
+            _LOGGER.debug(
+                "Azure fast: %d tool calls: %s",
+                len(tool_calls),
+                [tc.get("function", {}).get("name") for tc in tool_calls],
+            )
 
-                if not tool_calls:
-                    _LOGGER.info(
-                        "Azure fast: final response %d chars",
-                        len(content),
-                    )
-                    break
+            messages.append(message)
+            for tc in tool_calls:
+                func = tc.get("function", {})
+                tool_name = func.get("name", "")
+                tool_args_str = func.get("arguments", "{}")
+                try:
+                    tool_args = json.loads(tool_args_str)
+                except json.JSONDecodeError:
+                    tool_args = {}
 
-                _LOGGER.debug(
-                    "Azure fast: %d tool calls: %s",
-                    len(tool_calls),
-                    [tc.get("function", {}).get("name") for tc in tool_calls],
+                tool_result = await self._execute_tool(
+                    chat_log, tool_name, tool_args, user_input,
+                    session, data,
                 )
-
-                messages.append(message)
-                for tc in tool_calls:
-                    func = tc.get("function", {})
-                    tool_name = func.get("name", "")
-                    tool_args_str = func.get("arguments", "{}")
-                    try:
-                        tool_args = json.loads(tool_args_str)
-                    except json.JSONDecodeError:
-                        tool_args = {}
-
-                    tool_result = await self._execute_tool(
-                        chat_log, tool_name, tool_args, user_input,
-                        session, data,
-                    )
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc["id"],
-                        "content": tool_result,
-                    })
-            else:
-                content = (
-                    "I'm sorry, I reached the maximum number of tool calls. "
-                    "Please try a simpler request."
-                )
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc["id"],
+                    "content": tool_result,
+                })
+        else:
+            content = (
+                "I'm sorry, I reached the maximum number of tool calls. "
+                "Please try a simpler request."
+            )
 
         # Split for voice: short spoken part vs full email content
         spoken, full = split_response_for_voice(content)
@@ -1563,6 +1580,12 @@ class GHCPConversationEntity(ConversationEntity):
         # Always append family-friendly rules (after HA override so they stick)
         system_prompt += FAMILY_FRIENDLY_SUFFIX
 
+        # Voice conciseness: reinforce brevity when request comes from a satellite
+        if data.get(CONF_VOICE_CONCISENESS, True) and getattr(
+            user_input, "satellite_id", None
+        ):
+            system_prompt += VOICE_CONCISE_SUFFIX
+
         # Add shopping list guidance so the model knows the service calls
         system_prompt += SHOPPING_LIST_GUIDANCE
 
@@ -1587,65 +1610,65 @@ class GHCPConversationEntity(ConversationEntity):
         # Build tools from LLM API (+ synthetic orchestrator tools)
         tools = self._build_tools(chat_log, expert_model)
 
-        async with aiohttp.ClientSession() as session:
-            client = self._get_client(session)
+        session = async_get_clientsession(self.hass)
+        client = self._get_client(session)
 
-            try:
-                for _iteration in range(MAX_TOOL_ITERATIONS):
-                    response = await client.async_chat_completion(
-                        model=model,
-                        messages=messages,
-                        tools=tools or None,
-                        temperature=temperature,
-                        max_tokens=max_tokens,
+        try:
+            for _iteration in range(MAX_TOOL_ITERATIONS):
+                response = await client.async_chat_completion(
+                    model=model,
+                    messages=messages,
+                    tools=tools or None,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+
+                choice = response.get("choices", [{}])[0]
+                message = choice.get("message", {})
+                content = message.get("content", "")
+                tool_calls = message.get("tool_calls")
+
+                if not tool_calls:
+                    # Final response — no more tool calls
+                    break
+
+                # Process tool calls
+                messages.append(message)
+                for tc in tool_calls:
+                    func = tc.get("function", {})
+                    tool_name = func.get("name", "")
+                    tool_args_str = func.get("arguments", "{}")
+
+                    try:
+                        tool_args = json.loads(tool_args_str)
+                    except json.JSONDecodeError:
+                        tool_args = {}
+
+                    _LOGGER.debug(
+                        "Tool call: %s(%s)", tool_name, tool_args
                     )
 
-                    choice = response.get("choices", [{}])[0]
-                    message = choice.get("message", {})
-                    content = message.get("content", "")
-                    tool_calls = message.get("tool_calls")
+                    tool_result = await self._execute_tool(
+                        chat_log, tool_name, tool_args, user_input,
+                        session, data,
+                    )
 
-                    if not tool_calls:
-                        # Final response — no more tool calls
-                        break
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tc["id"],
+                            "content": tool_result,
+                        }
+                    )
+            else:
+                content = "I'm sorry, I reached the maximum number of tool calls. Please try a simpler request."
 
-                    # Process tool calls
-                    messages.append(message)
-                    for tc in tool_calls:
-                        func = tc.get("function", {})
-                        tool_name = func.get("name", "")
-                        tool_args_str = func.get("arguments", "{}")
-
-                        try:
-                            tool_args = json.loads(tool_args_str)
-                        except json.JSONDecodeError:
-                            tool_args = {}
-
-                        _LOGGER.debug(
-                            "Tool call: %s(%s)", tool_name, tool_args
-                        )
-
-                        tool_result = await self._execute_tool(
-                            chat_log, tool_name, tool_args, user_input,
-                            session, data,
-                        )
-
-                        messages.append(
-                            {
-                                "role": "tool",
-                                "tool_call_id": tc["id"],
-                                "content": tool_result,
-                            }
-                        )
-                else:
-                    content = "I'm sorry, I reached the maximum number of tool calls. Please try a simpler request."
-
-            except APIError as err:
-                _LOGGER.error("API error: %s", err)
-                content = f"Sorry, I encountered an error: {err}"
-            except Exception:
-                _LOGGER.exception("Unexpected error in conversation")
-                content = "Sorry, an unexpected error occurred."
+        except APIError as err:
+            _LOGGER.error("API error: %s", err)
+            content = f"Sorry, I encountered an error: {err}"
+        except Exception:
+            _LOGGER.exception("Unexpected error in conversation")
+            content = "Sorry, an unexpected error occurred."
 
         # Split for voice: short spoken part vs full email content
         spoken, full = split_response_for_voice(content)
@@ -1881,24 +1904,16 @@ class GHCPConversationEntity(ConversationEntity):
         ]
 
         try:
-            # Use existing session or create a new one
-            if http_session:
-                client = self._get_client(http_session)
-                response = await client.async_chat_completion(
-                    model=expert_model,
-                    messages=expert_messages,
-                    temperature=data.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE),
-                    max_tokens=int(data.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS)),
-                )
-            else:
-                async with aiohttp.ClientSession() as session:
-                    client = self._get_client(session)
-                    response = await client.async_chat_completion(
-                        model=expert_model,
-                        messages=expert_messages,
-                        temperature=data.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE),
-                        max_tokens=int(data.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS)),
-                    )
+            # Use existing session or fall back to HA shared session
+            if not http_session:
+                http_session = async_get_clientsession(self.hass)
+            client = self._get_client(http_session)
+            response = await client.async_chat_completion(
+                model=expert_model,
+                messages=expert_messages,
+                temperature=data.get(CONF_TEMPERATURE, DEFAULT_TEMPERATURE),
+                max_tokens=int(data.get(CONF_MAX_TOKENS, DEFAULT_MAX_TOKENS)),
+            )
 
             choice = response.get("choices", [{}])[0]
             expert_answer = choice.get("message", {}).get("content", "")

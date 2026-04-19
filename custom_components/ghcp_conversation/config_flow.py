@@ -69,6 +69,7 @@ from .const import (
     CONF_PROMPT,
     CONF_SHOW_ROUTE_TAG,
     CONF_TEMPERATURE,
+    CONF_VOICE_CONCISENESS,
     DEFAULT_AUTO_FIX_ENABLED,
     DEFAULT_AZURE_ROUTER_MODEL,
     DEFAULT_EMAIL_MODE,
@@ -743,6 +744,14 @@ class GHCPOptionsFlow(OptionsFlow):
             vol.Optional(
                 CONF_SHOW_ROUTE_TAG,
                 default=merged.get(CONF_SHOW_ROUTE_TAG, True),
+            )
+        ] = BooleanSelector()
+
+        # Voice conciseness toggle
+        schema_dict[
+            vol.Optional(
+                CONF_VOICE_CONCISENESS,
+                default=merged.get(CONF_VOICE_CONCISENESS, True),
             )
         ] = BooleanSelector()
 

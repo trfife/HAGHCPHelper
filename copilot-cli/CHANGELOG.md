@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.9.0 — Phase 1 Speed Optimizations
+
+- **Voice conciseness** — auto-detects satellite/voice requests via `satellite_id` and appends a brevity directive to the system prompt. Configurable toggle in options (default: on).
+- **Connection pooling** — replaced per-request `aiohttp.ClientSession()` with HA's shared session (`async_get_clientsession`) for all Azure, GitHub, Notion, and expert API calls. Eliminates TCP/TLS setup overhead (~100ms savings per call).
+- **Fire-and-forget post-processing** — email and Notion logging now run as background tasks instead of blocking the response. Joke tracking and shared context remain serial (they affect future turns). Mutable per-turn state is snapshotted before backgrounding.
+- **Expanded BUILTIN patterns** — added todo/task list patterns (add, complete, query) to the BUILTIN route for HA native intent handling.
+- **New option: Voice Conciseness** — toggle in Configure to enable/disable the voice brevity suffix for satellite requests.
+
 ## 3.5.0
 
 - **Notion conversation logging** — conversation logs now go to a Notion database instead of email. Configurable modes: Always, Long responses only, Failures only, or Off. Full response and routing trace stored as page body blocks. Email logging kept as legacy fallback.

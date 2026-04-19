@@ -114,6 +114,7 @@
           "azure_endpoint": "Endpoint URL",
           "azure_api_key": "API Key",
           "show_route_tag": "Show Route Tag",
+          "voice_conciseness": "Voice Conciseness",
           "prompt": "System Prompt",
           "notion_token": "Notion API Token",
           "notion_db_id": "Notion Database ID",
@@ -127,6 +128,7 @@
         },
         "data_description": {
           "show_route_tag": "Show [HA], [AZ], or [CLI] prefix on responses to indicate which backend handled the request.",
+          "voice_conciseness": "Reinforce brevity for voice satellite requests. Appends a conciseness directive to the system prompt when a satellite device is detected.",
           "prompt": "Custom system prompt for the AI. Leave empty to use the default. Supports Jinja2 templates.",
           "notion_token": "Notion integration token (starts with ntn_ or secret_). Create at notion.so/my-integrations.",
           "notion_db_id": "Database ID for the Conversation Logs database in Notion.",

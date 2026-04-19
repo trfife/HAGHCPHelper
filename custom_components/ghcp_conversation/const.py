@@ -208,6 +208,19 @@ NOTION_MAX_TEXT_CHARS = 2000  # Notion rich_text block limit
 # Route tag display
 CONF_SHOW_ROUTE_TAG = "show_route_tag"
 
+# Voice conciseness (auto-detected via satellite_id)
+CONF_VOICE_CONCISENESS = "voice_conciseness"
+
+VOICE_CONCISE_SUFFIX = (
+    "\n\n## Voice Brevity (satellite detected)\n"
+    "This response will be spoken aloud on a voice satellite. "
+    "Keep the spoken portion to 1 sentence for simple confirmations, "
+    "2 sentences maximum for complex answers. "
+    "No lists, no markdown, no code blocks in the spoken part. "
+    "If more detail is needed, give a brief spoken summary then use "
+    "the `[[DETAIL]]` marker followed by the full answer."
+)
+
 # Failure notification settings
 CONF_FAILURE_NOTIFY_SERVICE = "failure_notify_service"
 CONF_FAILURE_NOTIFY_ENABLED = "failure_notify_enabled"
