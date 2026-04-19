@@ -250,8 +250,16 @@ class GHCPConversationEntity(ConversationEntity):
         """Select the system prompt for conversation requests.
 
         Always uses BARNABEE_PROMPT as the base personality.
+        Appends speaker context if Voice Match identified the speaker.
         """
-        return BARNABEE_PROMPT
+        prompt = BARNABEE_PROMPT
+        speaker = getattr(self, "_current_speaker", None)
+        if speaker:
+            prompt += (
+                f"\n\nThe person speaking to you right now is {speaker.title()}. "
+                f"Address them by name naturally when appropriate (e.g. greetings, confirmations)."
+            )
+        return prompt
 
     def _get_device_context(
         self,
@@ -347,10 +355,27 @@ class GHCPConversationEntity(ConversationEntity):
         data = self._entry_data
         backend = data.get(CONF_BACKEND, BACKEND_GITHUB)
 
+        # Extract speaker name from Voice Match tag (e.g. "[thom] Turn on lights")
+        self._current_speaker: str | None = None
+        text = user_input.text
+        if text.startswith("["):
+            bracket_end = text.find("]")
+            if bracket_end > 0:
+                self._current_speaker = text[1:bracket_end].strip()
+                user_input = ConversationInput(
+                    text=text[bracket_end + 1:].strip(),
+                    context=user_input.context,
+                    conversation_id=user_input.conversation_id,
+                    device_id=user_input.device_id,
+                    language=user_input.language,
+                    agent_id=user_input.agent_id,
+                )
+
         _LOGGER.info(
-            "Incoming message: backend=%s agent=%s prompt='%s'",
+            "Incoming message: backend=%s agent=%s speaker=%s prompt='%s'",
             backend,
             self._attr_name,
+            self._current_speaker or "unknown",
             user_input.text[:100],
         )
 

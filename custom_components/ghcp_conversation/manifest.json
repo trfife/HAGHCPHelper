@@ -1,14 +1,20 @@
 {
   "domain": "ghcp_conversation",
   "name": "GitHub Copilot Conversation",
-  "codeowners": ["@trfife"],
+  "codeowners": [
+    "@trfife"
+  ],
   "config_flow": true,
-  "dependencies": ["conversation"],
+  "dependencies": [
+    "conversation"
+  ],
   "documentation": "https://github.com/trfife/HAGHCPHelper",
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/trfife/HAGHCPHelper/issues",
-  "requirements": ["aiosqlite>=0.20.0"],
+  "requirements": [
+    "aiosqlite>=0.20.0"
+  ],
   "single_config_entry": true,
-  "version": "3.5.2"
+  "version": "3.6.0"
 }
