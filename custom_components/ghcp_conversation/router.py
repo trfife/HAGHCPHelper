@@ -126,27 +126,6 @@ _BUILTIN_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         r"|that'?s\s+ok|n/?a|nope|nothing)\s*[.!]?\s*$",
         re.IGNORECASE,
     ), "nevermind"),
-
-    # ── Todo / Task list (HassListAddItem, etc.) ────────────────────
-    # "add X to my todo list" / "put X on my task list"
-    (re.compile(
-        r"\b(add|put)\b.+\b(todo\s*list|task\s*list|to-do\s*list)\b",
-        re.IGNORECASE,
-    ), "todo_add"),
-
-    # "remove/complete X from my todo list"
-    (re.compile(
-        r"\b(remove|delete|complete|check\s+off|mark\s+(?:as\s+)?done)\b.+"
-        r"\b(todo\s*list|task\s*list|to-do\s*list)\b",
-        re.IGNORECASE,
-    ), "todo_complete"),
-
-    # "what's on my todo list?" / "show my todo list"
-    (re.compile(
-        r"\b(what'?s|show|list|read|what\s+is)\b.+"
-        r"\b(todo\s*list|task\s*list|to-do\s*list)\b",
-        re.IGNORECASE,
-    ), "todo_query"),
 ]
 
 _AZURE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
