@@ -1168,11 +1168,22 @@ class GHCPConversationEntity(ConversationEntity):
                 from homeassistant.components.conversation import (
                     async_converse,
                 )
+                # Strip wake word prefix — STT may transcribe "Barnaby add X"
+                # but HA default agent can't parse with the name attached.
+                builtin_text = re.sub(
+                    r"^(?:hey\s+)?barnab[ey]\s*[,:]?\s*",
+                    "",
+                    user_input.text,
+                    flags=re.IGNORECASE,
+                ).strip() or user_input.text
                 if trace:
-                    trace.step("BUILTIN→HA default agent for native intent")
+                    trace.step(
+                        f"BUILTIN→HA default agent for native intent "
+                        f"(text='{builtin_text[:60]}')"
+                    )
                 builtin_result = await async_converse(
                     self.hass,
-                    user_input.text,
+                    builtin_text,
                     conversation_id=user_input.conversation_id,
                     context=user_input.context,
                     language=user_input.language,

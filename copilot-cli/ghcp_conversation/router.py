@@ -65,43 +65,10 @@ _BUILTIN_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # NOTE: clear/query/show shopping list do NOT work with HA default agent.
     # Those go to the LLM which has shopping list tools instead.
 
-    # ── Timers (HassStartTimer, HassCancelTimer, etc.) ──────────────
-    # "set a timer for 5 minutes" / "start a 10 minute timer"
-    (re.compile(
-        r"\b(set|start|create|begin)\b.+\btimer\b",
-        re.IGNORECASE,
-    ), "timer_start"),
-
-    # "cancel/stop/clear the timer" / "cancel all timers"
-    (re.compile(
-        r"\b(cancel|stop|clear|remove|delete)\b.+\btimer",
-        re.IGNORECASE,
-    ), "timer_cancel"),
-
-    # "pause/resume the timer"
-    (re.compile(
-        r"\b(pause|unpause|resume)\b.+\btimer",
-        re.IGNORECASE,
-    ), "timer_pause"),
-
-    # "how much time is left" / "timer status" / "what timers are running"
-    (re.compile(
-        r"\b(how\s+much\s+time|how\s+long|timer\s+status|"
-        r"what\s+timer|time\s+left|time\s+remaining)\b",
-        re.IGNORECASE,
-    ), "timer_status"),
-
-    # "add/increase 5 minutes to the timer"
-    (re.compile(
-        r"\b(add|increase|decrease|reduce|extend)\b.+\btimer\b",
-        re.IGNORECASE,
-    ), "timer_adjust"),
-
-    # Reversed: "timer: set/cancel/pause"
-    (re.compile(
-        r"\btimer\b.+\b(set|start|cancel|stop|pause|resume|add|for)\b",
-        re.IGNORECASE,
-    ), "timer_reversed"),
+    # NOTE: Timer patterns removed — HA default agent returns "timers are not
+    # supported on this device" from text API.  Timers work natively when the
+    # voice pipeline has a real satellite device_id, but that goes through
+    # the assist pipeline directly, not through our BUILTIN route.
 
     # ── Date / Time (HassGetCurrentDate, HassGetCurrentTime) ────────
     (re.compile(
