@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.9.4
+
+- **Always yolo + resume** — CLI terminal now always starts with `--yolo --continue` flags, automatically resuming the last session with all permissions enabled. Removes the need for the `auto_approve` toggle (default changed to true).
+- **BUILTIN pattern fixes** — removed shopping list query/clear and all timer patterns from BUILTIN route (HA default agent can't handle them). Narrowed `shopping_list_reversed` to add/remove verbs only.
+- **Wake word stripping** — strips "Barnaby/Barnabee" prefix from transcripts before BUILTIN passthrough so HA default agent doesn't parse it as a device name.
+- **Shopping list injection** — pre-fetches shopping list contents and injects into LLM prompt when user asks about their list. Works via `hass.data["shopping_list"]` with Supervisor API fallback.
+- **VACA unstick automation** — updated `unstick_satellite_listening` to also trigger on `processing` state >60s (was only `listening` >10s).
+
 ## 3.9.0 — Phase 1 Speed Optimizations
 
 - **Voice conciseness** — auto-detects satellite/voice requests via `satellite_id` and appends a brevity directive to the system prompt. Configurable toggle in options (default: on).

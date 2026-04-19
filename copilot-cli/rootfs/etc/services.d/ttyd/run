@@ -770,15 +770,13 @@ echo "set-option -g default-command /bin/bash" >> /root/.tmux.conf
 
 # -------------------------------------------------------
 # Build Copilot CLI launch arguments
+# Always run with --yolo (all permissions) and --continue (resume last session)
 # -------------------------------------------------------
-COPILOT_ARGS=""
+COPILOT_ARGS="--yolo --continue"
 if [ "${MODEL}" != "default" ] && [ -n "${MODEL}" ]; then
-    COPILOT_ARGS="--model ${MODEL}"
+    COPILOT_ARGS="${COPILOT_ARGS} --model ${MODEL}"
 fi
-if bashio::var.true "${AUTO_APPROVE}"; then
-    COPILOT_ARGS="${COPILOT_ARGS} --allow-all-tools"
-    bashio::log.warning "Auto-approve mode enabled — Copilot can execute any tool without asking"
-fi
+bashio::log.info "Copilot CLI args: ${COPILOT_ARGS}"
 
 # -------------------------------------------------------
 # Create startup script
@@ -789,11 +787,8 @@ source /data/copilot-env.sh
 cd /homeassistant 2>/dev/null || cd /root
 echo ""
 echo "  GitHub Copilot CLI for Home Assistant"
-echo "  Session: ${SESSION_NAME} | Model: ${MODEL}"
+echo "  Session: ${SESSION_NAME} | Model: ${MODEL} | Mode: yolo + resume"
 echo "  Close this tab anytime — your session persists!"
-echo ""
-echo "  Type 'copilot' to start, or '/login' inside to authenticate."
-echo "  Aliases: c = copilot | ha-config = cd to HA config"
 echo ""
 exec copilot ${COPILOT_ARGS}
 STARTEOF
