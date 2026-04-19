@@ -362,14 +362,8 @@ class GHCPConversationEntity(ConversationEntity):
             bracket_end = text.find("]")
             if bracket_end > 0:
                 self._current_speaker = text[1:bracket_end].strip()
-                user_input = ConversationInput(
-                    text=text[bracket_end + 1:].strip(),
-                    context=user_input.context,
-                    conversation_id=user_input.conversation_id,
-                    device_id=user_input.device_id,
-                    language=user_input.language,
-                    agent_id=user_input.agent_id,
-                )
+                # Strip the tag from the text in-place
+                user_input.text = text[bracket_end + 1:].strip()
 
         _LOGGER.info(
             "Incoming message: backend=%s agent=%s speaker=%s prompt='%s'",
