@@ -13,7 +13,7 @@ _LOGGER = logging.getLogger(__name__)
 class Route(str, Enum):
     """Routing destinations for conversation requests."""
 
-    BUILTIN = "builtin"  # HA native intents (shopping list, todo, etc.)
+    BUILTIN = "builtin"  # HA native intents (shopping list, timers, date/time)
     LOCAL = "local"    # Direct HA tool call, no LLM needed
     AZURE = "azure"    # Fast Azure model for moderate queries
     CLI = "cli"        # Copilot CLI expert for complex tasks
@@ -74,6 +74,58 @@ _BUILTIN_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         r"\b(add|remove|clear|complete|delete|empty|what'?s\s+on|put)\b",
         re.IGNORECASE,
     ), "shopping_list_reversed"),
+
+    # ── Timers (HassStartTimer, HassCancelTimer, etc.) ──────────────
+    # "set a timer for 5 minutes" / "start a 10 minute timer"
+    (re.compile(
+        r"\b(set|start|create|begin)\b.+\btimer\b",
+        re.IGNORECASE,
+    ), "timer_start"),
+
+    # "cancel/stop/clear the timer" / "cancel all timers"
+    (re.compile(
+        r"\b(cancel|stop|clear|remove|delete)\b.+\btimer",
+        re.IGNORECASE,
+    ), "timer_cancel"),
+
+    # "pause/resume the timer"
+    (re.compile(
+        r"\b(pause|unpause|resume)\b.+\btimer",
+        re.IGNORECASE,
+    ), "timer_pause"),
+
+    # "how much time is left" / "timer status" / "what timers are running"
+    (re.compile(
+        r"\b(how\s+much\s+time|how\s+long|timer\s+status|"
+        r"what\s+timer|time\s+left|time\s+remaining)\b",
+        re.IGNORECASE,
+    ), "timer_status"),
+
+    # "add/increase 5 minutes to the timer"
+    (re.compile(
+        r"\b(add|increase|decrease|reduce|extend)\b.+\btimer\b",
+        re.IGNORECASE,
+    ), "timer_adjust"),
+
+    # Reversed: "timer: set/cancel/pause"
+    (re.compile(
+        r"\btimer\b.+\b(set|start|cancel|stop|pause|resume|add|for)\b",
+        re.IGNORECASE,
+    ), "timer_reversed"),
+
+    # ── Date / Time (HassGetCurrentDate, HassGetCurrentTime) ────────
+    (re.compile(
+        r"\b(what('?s|\s+is)\s+(?:the\s+)?(current\s+)?(time|date|day))\b"
+        r"|\b(what\s+(time|date|day)\s+is\s+it)\b",
+        re.IGNORECASE,
+    ), "date_time_query"),
+
+    # ── Cancel / Nevermind (HassNevermind) ──────────────────────────
+    (re.compile(
+        r"^\s*(never\s*mind|nevermind|forget\s*(it|about\s+it)?|cancel"
+        r"|that'?s\s+ok|n/?a|nope|nothing)\s*[.!]?\s*$",
+        re.IGNORECASE,
+    ), "nevermind"),
 ]
 
 _AZURE_PATTERNS: list[tuple[re.Pattern[str], str]] = [

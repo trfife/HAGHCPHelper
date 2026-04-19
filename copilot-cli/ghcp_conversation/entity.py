@@ -1152,7 +1152,7 @@ class GHCPConversationEntity(ConversationEntity):
 
         try:
             if decision.route == Route.BUILTIN:
-                # ── HA native intent (shopping list, todo) ────────────
+                # ── HA native intent (shopping list, timers, date/time) ──
                 # Pass through to HA's default conversation agent
                 from homeassistant.components.conversation import (
                     async_converse,
@@ -1166,6 +1166,8 @@ class GHCPConversationEntity(ConversationEntity):
                     context=user_input.context,
                     language=user_input.language,
                     agent_id="homeassistant",
+                    device_id=getattr(user_input, "device_id", None),
+                    satellite_id=getattr(user_input, "satellite_id", None),
                 )
                 if trace:
                     resp = _extract_response_text(builtin_result)
