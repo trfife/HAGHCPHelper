@@ -69,6 +69,7 @@ from .const import (
     CONF_MODEL,
     CONF_NOTION_DB_ID,
     CONF_NOTION_LOG_MODE,
+    CONF_SHOW_ROUTE_TAG,
     CONF_NOTION_TOKEN,
     CONF_PROMPT,
     CONF_TEMPERATURE,
@@ -459,7 +460,8 @@ class GHCPConversationEntity(ConversationEntity):
         )
 
         # Prefix the spoken response with a route tag for visibility
-        if self._last_route_tag and result.response and result.response.speech:
+        show_tag = data.get(CONF_SHOW_ROUTE_TAG, True)
+        if show_tag and self._last_route_tag and result.response and result.response.speech:
             plain = result.response.speech.get("plain", {})
             speech_text = plain.get("speech", "")
             if speech_text:

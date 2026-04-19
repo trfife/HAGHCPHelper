@@ -20,6 +20,7 @@ from homeassistant.const import CONF_LLM_HASS_API
 from homeassistant.core import callback
 from homeassistant.helpers import llm
 from homeassistant.helpers.selector import (
+    BooleanSelector,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -66,6 +67,7 @@ from .const import (
     CONF_NOTION_LOG_MODE,
     CONF_NOTION_TOKEN,
     CONF_PROMPT,
+    CONF_SHOW_ROUTE_TAG,
     CONF_TEMPERATURE,
     DEFAULT_AUTO_FIX_ENABLED,
     DEFAULT_AZURE_ROUTER_MODEL,
@@ -727,6 +729,14 @@ class GHCPOptionsFlow(OptionsFlow):
                     default=merged.get(CONF_MODEL, ""),
                 )
             ] = TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT))
+
+        # Route tag toggle
+        schema_dict[
+            vol.Optional(
+                CONF_SHOW_ROUTE_TAG,
+                default=merged.get(CONF_SHOW_ROUTE_TAG, True),
+            )
+        ] = BooleanSelector()
 
         # Notion logging settings (preferred over email)
         schema_dict[

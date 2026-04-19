@@ -205,6 +205,9 @@ NOTION_API_URL = "https://api.notion.com/v1"
 NOTION_API_VERSION = "2022-06-28"
 NOTION_MAX_TEXT_CHARS = 2000  # Notion rich_text block limit
 
+# Route tag display
+CONF_SHOW_ROUTE_TAG = "show_route_tag"
+
 # Failure notification settings
 CONF_FAILURE_NOTIFY_SERVICE = "failure_notify_service"
 CONF_FAILURE_NOTIFY_ENABLED = "failure_notify_enabled"
