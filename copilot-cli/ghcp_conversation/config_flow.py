@@ -730,6 +730,14 @@ class GHCPOptionsFlow(OptionsFlow):
                 )
             ] = TextSelector(TextSelectorConfig(type=TextSelectorType.TEXT))
 
+        # System prompt
+        schema_dict[
+            vol.Optional(
+                CONF_PROMPT,
+                default=merged.get(CONF_PROMPT, ""),
+            )
+        ] = TemplateSelector()
+
         # Route tag toggle
         schema_dict[
             vol.Optional(

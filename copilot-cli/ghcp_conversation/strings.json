@@ -114,6 +114,7 @@
           "azure_endpoint": "Endpoint URL",
           "azure_api_key": "API Key",
           "show_route_tag": "Show Route Tag",
+          "prompt": "System Prompt",
           "notion_token": "Notion API Token",
           "notion_db_id": "Notion Database ID",
           "notion_log_mode": "Notion Logging",
@@ -126,6 +127,7 @@
         },
         "data_description": {
           "show_route_tag": "Show [HA], [AZ], or [CLI] prefix on responses to indicate which backend handled the request.",
+          "prompt": "Custom system prompt for the AI. Leave empty to use the default. Supports Jinja2 templates.",
           "notion_token": "Notion integration token (starts with ntn_ or secret_). Create at notion.so/my-integrations.",
           "notion_db_id": "Database ID for the Conversation Logs database in Notion.",
           "notion_log_mode": "When to log to Notion: Off, Always, Long responses only, or Failures only.",
