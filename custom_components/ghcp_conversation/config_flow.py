@@ -734,7 +734,7 @@ class GHCPOptionsFlow(OptionsFlow):
         schema_dict[
             vol.Optional(
                 CONF_PROMPT,
-                default=merged.get(CONF_PROMPT, ""),
+                default=merged.get(CONF_PROMPT) or DEFAULT_PROMPT,
             )
         ] = TemplateSelector()
 
