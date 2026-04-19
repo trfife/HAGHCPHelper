@@ -67,6 +67,9 @@ from .const import (
     CONF_GITHUB_TOKEN,
     CONF_MAX_TOKENS,
     CONF_MODEL,
+    CONF_NOTION_DB_ID,
+    CONF_NOTION_LOG_MODE,
+    CONF_NOTION_TOKEN,
     CONF_PROMPT,
     CONF_TEMPERATURE,
     DEFAULT_AUTO_FIX_ENABLED,
@@ -76,6 +79,7 @@ from .const import (
     DEFAULT_FAILURE_NOTIFY_ENABLED,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
+    DEFAULT_NOTION_LOG_MODE,
     DEFAULT_PROMPT,
     DEFAULT_TEMPERATURE,
     DOMAIN,
@@ -83,10 +87,21 @@ from .const import (
     EMAIL_MODE_LONG_ONLY,
     EMAIL_MODE_OFF,
     EXPERT_TOOL_NAME,
+    JOKE_HISTORY_LIMIT,
+    JOKE_INJECT_LIMIT,
+    JOKE_REQUEST_KEYWORDS,
     KNOWLEDGE_TOOL_NAME,
     MAX_EMAIL_THINKING_CHARS,
+    NOTION_API_URL,
+    NOTION_API_VERSION,
+    NOTION_LOG_MODE_ALWAYS,
+    NOTION_LOG_MODE_FAILURES,
+    NOTION_LOG_MODE_LONG_ONLY,
+    NOTION_LOG_MODE_OFF,
+    NOTION_MAX_TEXT_CHARS,
     ORCHESTRATOR_PROMPT_SUFFIX,
     SATELLITE_CONTEXT_TEMPLATE,
+    SHOPPING_LIST_GUIDANCE,
     SUBENTRY_TYPE_CONVERSATION,
     VOICE_DETAIL_SEPARATOR,
     FAMILY_FRIENDLY_SUFFIX,
@@ -140,8 +155,14 @@ _DEFLECTION_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"\b(?:you (?:would need to|should|might want to|could try|may need to) (?:ask|use|contact|check|consult))\b", re.IGNORECASE),
     re.compile(r"\b(?:(?:not|don't) have (?:direct )?access to (?:your|the|that))\b", re.IGNORECASE),
     re.compile(r"\b(?:requires? (?:direct|file|ssh|terminal|shell|cli) access)\b", re.IGNORECASE),
-    re.compile(r"\b(?:(?:can't|cannot) (?:directly )?(?:edit|modify|create|write|read|access|manage|configure) (?:files?|config|yaml|dashboard))\b", re.IGNORECASE),
-    re.compile(r"\b(?:(?:don't|do not) have (?:the )?(?:tools?|capability|means) to)\b", re.IGNORECASE),
+    re.compile(r"\b(?:(?:can't|cannot) (?:directly )?(?:edit|modify|create|write|read|access|manage|configure|clear|delete|remove) (?:files?|config|yaml|dashboard|your|the|that|a))\b", re.IGNORECASE),
+    re.compile(r"\b(?:(?:don't|do not) have (?:the )?(?:tools?|capability|means|ability) to)\b", re.IGNORECASE),
+    # Additional deflection phrases
+    re.compile(r"\b(?:that'?s not something i (?:can|am able to))\b", re.IGNORECASE),
+    re.compile(r"\b(?:i (?:don't|do not) (?:currently )?have (?:the ability|a way) to)\b", re.IGNORECASE),
+    re.compile(r"\b(?:(?:unfortunately|i'?m afraid),? i (?:can't|cannot|don't|am unable))\b", re.IGNORECASE),
+    re.compile(r"\b(?:this (?:requires|needs|would need) (?:access to|a|the))\b.+\b(?:which i (?:don't|do not) have)\b", re.IGNORECASE),
+    re.compile(r"\b(?:i (?:don't|do not) have (?:the )?(?:necessary|required|appropriate) (?:access|tools?|permissions?))\b", re.IGNORECASE),
 ]
 
 
@@ -416,8 +437,21 @@ class GHCPConversationEntity(ConversationEntity):
             self._last_route_tag = "azure"
             result = await self._async_handle_direct_api(user_input, chat_log, data)
 
-        # Send email notification if configured
+        # Send email notification if configured (legacy)
         await self._async_maybe_send_email(user_input.text, result, data)
+
+        # Log to Notion if configured (preferred over email)
+        await self._async_maybe_log_to_notion(user_input.text, result, data)
+
+        # Track jokes for de-duplication
+        if self._is_joke_request(user_input.text):
+            response_text = self._last_full_response or ""
+            if not response_text and result.response and result.response.speech:
+                response_text = result.response.speech.get("plain", {}).get(
+                    "speech", ""
+                )
+            if response_text:
+                await self._async_maybe_log_joke(response_text)
 
         # Write to shared context for cross-interface memory
         await self._async_write_shared_context(
@@ -523,7 +557,10 @@ class GHCPConversationEntity(ConversationEntity):
         result: ConversationResult,
         data: dict[str, Any],
     ) -> None:
-        """Send an email with the response and thinking log if configured."""
+        """Send an email with the response and thinking log if configured.
+
+        Legacy — kept for backward compat. Notion logging is preferred.
+        """
         email_mode = data.get(CONF_EMAIL_MODE, DEFAULT_EMAIL_MODE)
         if email_mode == EMAIL_MODE_OFF:
             return
@@ -598,6 +635,226 @@ class GHCPConversationEntity(ConversationEntity):
                 "Failed to send email via notify.%s", service_name,
                 exc_info=True,
             )
+
+    # ── Notion logging ───────────────────────────────────────────────────
+
+    async def _async_maybe_log_to_notion(
+        self,
+        user_prompt: str,
+        result: ConversationResult,
+        data: dict[str, Any],
+        *,
+        is_failure: bool = False,
+        error_msg: str = "",
+    ) -> None:
+        """Log conversation to Notion database if configured."""
+        log_mode = data.get(CONF_NOTION_LOG_MODE, DEFAULT_NOTION_LOG_MODE)
+        if log_mode == NOTION_LOG_MODE_OFF:
+            return
+
+        notion_token = data.get(CONF_NOTION_TOKEN, "")
+        notion_db_id = data.get(CONF_NOTION_DB_ID, "")
+        if not notion_token or not notion_db_id:
+            return
+
+        # Determine if we should log based on mode
+        response_text = self._last_full_response or ""
+        if not response_text and result and result.response and result.response.speech:
+            response_text = result.response.speech.get("plain", {}).get("speech", "")
+
+        if log_mode == NOTION_LOG_MODE_FAILURES and not is_failure:
+            return
+        if log_mode == NOTION_LOG_MODE_LONG_ONLY and not is_failure:
+            threshold = int(data.get(CONF_EMAIL_THRESHOLD, DEFAULT_EMAIL_THRESHOLD))
+            if len(response_text) < threshold:
+                return
+
+        # Build title
+        title = user_prompt[:60]
+        if len(user_prompt) > 60:
+            title += "…"
+
+        # Status
+        if is_failure:
+            status = "❌ Failed"
+        elif self._last_route_tag == "cli" and self._last_route_trace:
+            # Check if Azure deflected
+            if any("DEFLECTED" in s for s in self._last_route_trace):
+                status = "⚠️ Deflected"
+            else:
+                status = "✅ Success"
+        else:
+            status = "✅ Success"
+
+        route = self._last_route_tag or "unknown"
+        model = getattr(self, "_last_model", "") or ""
+
+        # Fire and forget — don't block the response
+        self.hass.async_create_task(
+            self._async_notion_write(
+                notion_token, notion_db_id, title, route, model,
+                status, response_text, error_msg, user_prompt,
+            ),
+            "ghcp_notion_log",
+        )
+
+    async def _async_notion_write(
+        self,
+        token: str,
+        db_id: str,
+        title: str,
+        route: str,
+        model: str,
+        status: str,
+        response_text: str,
+        error_msg: str,
+        user_prompt: str,
+    ) -> None:
+        """Write a conversation log entry to Notion (background task)."""
+        from datetime import date
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "Notion-Version": NOTION_API_VERSION,
+        }
+
+        # Build properties (small metadata)
+        properties: dict[str, Any] = {
+            "Title": {"title": [{"text": {"content": title}}]},
+            "Date": {"date": {"start": date.today().isoformat()}},
+            "Route": {"select": {"name": route}},
+            "Status": {"select": {"name": status}},
+        }
+        if model:
+            properties["Model"] = {
+                "rich_text": [{"text": {"content": model[:100]}}]
+            }
+        if response_text:
+            properties["Response Length"] = {"number": len(response_text)}
+        if error_msg:
+            properties["Error"] = {
+                "rich_text": [{"text": {"content": error_msg[:200]}}]
+            }
+
+        # Build page body blocks (full content)
+        children: list[dict[str, Any]] = []
+
+        # User prompt block
+        children.append({
+            "object": "block",
+            "type": "heading_3",
+            "heading_3": {"rich_text": [{"text": {"content": "User Message"}}]},
+        })
+        for chunk in self._chunk_text(user_prompt):
+            children.append({
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {"rich_text": [{"text": {"content": chunk}}]},
+            })
+
+        # Routing trace
+        if self._last_route_trace:
+            children.append({
+                "object": "block",
+                "type": "heading_3",
+                "heading_3": {"rich_text": [{"text": {"content": "Routing"}}]},
+            })
+            for step in self._last_route_trace[:20]:
+                children.append({
+                    "object": "block",
+                    "type": "bulleted_list_item",
+                    "bulleted_list_item": {
+                        "rich_text": [{"text": {"content": step[:NOTION_MAX_TEXT_CHARS]}}]
+                    },
+                })
+
+        # Response block
+        if response_text:
+            children.append({
+                "object": "block",
+                "type": "heading_3",
+                "heading_3": {"rich_text": [{"text": {"content": "Response"}}]},
+            })
+            for chunk in self._chunk_text(response_text):
+                children.append({
+                    "object": "block",
+                    "type": "paragraph",
+                    "paragraph": {"rich_text": [{"text": {"content": chunk}}]},
+                })
+
+        payload: dict[str, Any] = {
+            "parent": {"database_id": db_id},
+            "properties": properties,
+        }
+        if children:
+            payload["children"] = children[:100]  # Notion limit
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{NOTION_API_URL}/pages",
+                    headers=headers,
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=15),
+                ) as resp:
+                    if resp.status == 200:
+                        _LOGGER.info("Notion log created for: %s", title)
+                    else:
+                        body = await resp.text()
+                        _LOGGER.warning(
+                            "Notion API error %d: %s", resp.status, body[:200]
+                        )
+        except Exception:
+            _LOGGER.warning("Failed to log to Notion", exc_info=True)
+
+    @staticmethod
+    def _chunk_text(text: str, max_len: int = NOTION_MAX_TEXT_CHARS) -> list[str]:
+        """Split text into chunks that fit Notion's rich_text limit."""
+        if not text:
+            return []
+        chunks = []
+        for i in range(0, len(text), max_len):
+            chunks.append(text[i : i + max_len])
+        return chunks
+
+    # ── Joke tracking ────────────────────────────────────────────────────
+
+    @staticmethod
+    def _is_joke_request(user_prompt: str) -> bool:
+        """Check if the user is asking for a joke."""
+        text = user_prompt.lower().strip()
+        return any(kw in text for kw in JOKE_REQUEST_KEYWORDS)
+
+    async def _async_get_joke_exclusions(self) -> str:
+        """Build prompt text listing recent jokes to avoid."""
+        analytics: AnalyticsStore | None = self.hass.data.get(
+            DOMAIN, {}
+        ).get("analytics")
+        if not analytics:
+            return ""
+        recent = await analytics.async_get_recent_jokes(JOKE_INJECT_LIMIT)
+        if not recent:
+            return ""
+        lines = []
+        for i, joke in enumerate(recent, 1):
+            # Truncate to just punchline-length for prompt efficiency
+            short = joke[:120].replace("\n", " ")
+            lines.append(f"{i}. {short}")
+        return (
+            "\n\n## Recently Told Jokes (DO NOT repeat these)\n"
+            + "\n".join(lines)
+            + "\nTell a DIFFERENT joke you haven't told recently."
+        )
+
+    async def _async_maybe_log_joke(self, response_text: str) -> None:
+        """If the response looks like a joke, log it."""
+        analytics: AnalyticsStore | None = self.hass.data.get(
+            DOMAIN, {}
+        ).get("analytics")
+        if not analytics or not response_text:
+            return
+        await analytics.async_log_joke(response_text)
 
     @staticmethod
     def _diagnose_failure(
@@ -1074,6 +1331,16 @@ class GHCPConversationEntity(ConversationEntity):
                     conversation_id=chat_log.conversation_id or "",
                     data=data,
                 )
+                # Also log failures to Notion
+                error_result = ConversationResult(
+                    response=intent.IntentResponse(language=user_input.language),
+                    conversation_id=chat_log.conversation_id,
+                )
+                await self._async_maybe_log_to_notion(
+                    user_input.text, error_result, data,
+                    is_failure=True,
+                    error_msg=metrics.error_msg or "Unknown error",
+                )
 
     async def _async_handle_azure_fast(
         self,
@@ -1113,6 +1380,15 @@ class GHCPConversationEntity(ConversationEntity):
 
         # Always append family-friendly rules (after HA override so they stick)
         system_prompt += FAMILY_FRIENDLY_SUFFIX
+
+        # Add shopping list guidance so Azure knows the service calls
+        system_prompt += SHOPPING_LIST_GUIDANCE
+
+        # Inject joke exclusions when user asks for a joke
+        if self._is_joke_request(user_input.text):
+            joke_exclusions = await self._async_get_joke_exclusions()
+            if joke_exclusions:
+                system_prompt += joke_exclusions
 
         # Inject cross-interface context (CLI activity) into system prompt
         system_prompt = await self._async_enrich_with_shared_context(
@@ -1260,6 +1536,15 @@ class GHCPConversationEntity(ConversationEntity):
 
         # Always append family-friendly rules (after HA override so they stick)
         system_prompt += FAMILY_FRIENDLY_SUFFIX
+
+        # Add shopping list guidance so the model knows the service calls
+        system_prompt += SHOPPING_LIST_GUIDANCE
+
+        # Inject joke exclusions when user asks for a joke
+        if self._is_joke_request(user_input.text):
+            joke_exclusions = await self._async_get_joke_exclusions()
+            if joke_exclusions:
+                system_prompt += joke_exclusions
 
         # Append orchestrator instructions when expert model is configured
         if expert_model:

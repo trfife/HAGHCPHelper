@@ -101,6 +101,20 @@ _LOCAL_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         re.IGNORECASE,
     ), "cover_control"),
 
+    # Shopping list management
+    (re.compile(
+        r"\b(add|remove|clear|complete|check\s+off|cross\s+off|delete|empty)"
+        r"\b.+\b(shopping\s*list|grocery\s*list)\b",
+        re.IGNORECASE,
+    ), "shopping_list"),
+
+    # Shopping list — reversed phrasing ("shopping list: add X")
+    (re.compile(
+        r"\b(shopping\s*list|grocery\s*list)\b.+"
+        r"\b(add|remove|clear|complete|delete|empty|what'?s\s+on)\b",
+        re.IGNORECASE,
+    ), "shopping_list"),
+
     # Simple state queries
     (re.compile(
         r"\b(what(?:'s| is| are)|what's|show me|tell me|get)\b.+"
@@ -115,6 +129,12 @@ _LOCAL_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         r"home|away|armed|disarmed|running|idle)\b\s*\??\s*$",
         re.IGNORECASE,
     ), "state_check"),
+
+    # "What's on my shopping list?"
+    (re.compile(
+        r"\b(what'?s|show|list|read)\b.+\b(shopping\s*list|grocery\s*list)\b",
+        re.IGNORECASE,
+    ), "shopping_list_query"),
 ]
 
 _CLI_PATTERNS: list[tuple[re.Pattern[str], str]] = [

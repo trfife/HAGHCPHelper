@@ -105,6 +105,20 @@ INSERT INTO knowledge (query, answer, tags, timestamp, source)
 VALUES (?, ?, ?, ?, ?)
 """
 
+_CREATE_JOKE_HISTORY_TABLE = """
+CREATE TABLE IF NOT EXISTS joke_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL,
+    joke_text TEXT NOT NULL,
+    fingerprint TEXT NOT NULL
+)
+"""
+
+_INSERT_JOKE = """
+INSERT INTO joke_history (timestamp, joke_text, fingerprint)
+VALUES (?, ?, ?)
+"""
+
 
 @dataclass
 class RequestMetrics:
@@ -167,6 +181,7 @@ class AnalyticsStore:
         await self._db.execute(_CREATE_KNOWLEDGE_TABLE)
         await self._db.execute(_CREATE_TRACE_TABLE)
         await self._db.execute(_CREATE_SHARED_CONTEXT_TABLE)
+        await self._db.execute(_CREATE_JOKE_HISTORY_TABLE)
         await self._db.commit()
         _LOGGER.debug("Analytics DB ready at %s", self._db_path)
 
@@ -615,3 +630,72 @@ class AnalyticsStore:
             await self._db.commit()
         except Exception:
             _LOGGER.debug("Failed to prune shared context")
+
+    # ── Joke history ─────────────────────────────────────────────────────
+
+    @staticmethod
+    def _normalize_joke(text: str) -> str:
+        """Create a normalized fingerprint for joke dedup."""
+        import re as _re
+        # Lowercase, strip punctuation and extra whitespace
+        t = text.lower().strip()
+        t = _re.sub(r"[^\w\s]", "", t)
+        t = _re.sub(r"\s+", " ", t)
+        # Take first 200 chars as fingerprint basis
+        return t[:200]
+
+    async def async_log_joke(self, joke_text: str) -> None:
+        """Log a joke to history for de-duplication."""
+        if not self._db or not joke_text:
+            return
+        try:
+            fingerprint = self._normalize_joke(joke_text)
+            await self._db.execute(
+                _INSERT_JOKE,
+                (
+                    datetime.now(timezone.utc).isoformat(),
+                    joke_text[:500],
+                    fingerprint,
+                ),
+            )
+            await self._db.commit()
+        except Exception:
+            _LOGGER.debug("Failed to log joke")
+
+    async def async_get_recent_jokes(self, limit: int = 15) -> list[str]:
+        """Return recent joke texts for exclusion."""
+        if not self._db:
+            return []
+        try:
+            cursor = await self._db.execute(
+                """
+                SELECT joke_text FROM joke_history
+                ORDER BY id DESC LIMIT ?
+                """,
+                (limit,),
+            )
+            rows = await cursor.fetchall()
+            return [r[0] for r in rows]
+        except Exception:
+            _LOGGER.debug("Failed to read joke history")
+            return []
+
+    async def async_is_duplicate_joke(self, joke_text: str) -> bool:
+        """Check if a joke fingerprint matches a recent one."""
+        if not self._db or not joke_text:
+            return False
+        try:
+            fingerprint = self._normalize_joke(joke_text)
+            cursor = await self._db.execute(
+                """
+                SELECT COUNT(*) FROM joke_history
+                WHERE fingerprint = ?
+                AND id IN (SELECT id FROM joke_history ORDER BY id DESC LIMIT 30)
+                """,
+                (fingerprint,),
+            )
+            row = await cursor.fetchone()
+            return bool(row and row[0] > 0)
+        except Exception:
+            _LOGGER.debug("Failed to check joke duplicate")
+            return False

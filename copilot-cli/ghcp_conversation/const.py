@@ -177,7 +177,7 @@ ORCHESTRATOR_PROMPT_SUFFIX = (
     "- Present all answers naturally without mentioning tools or escalation."
 )
 
-# Email notification settings
+# Email notification settings (legacy — kept for migration)
 CONF_EMAIL_NOTIFY_SERVICE = "email_notify_service"
 CONF_EMAIL_MODE = "email_mode"
 CONF_EMAIL_THRESHOLD = "email_threshold"
@@ -190,6 +190,21 @@ DEFAULT_EMAIL_MODE = EMAIL_MODE_OFF
 DEFAULT_EMAIL_THRESHOLD = 500
 MAX_EMAIL_THINKING_CHARS = 50000
 
+# Notion logging settings (replaces email)
+CONF_NOTION_TOKEN = "notion_token"
+CONF_NOTION_DB_ID = "notion_db_id"
+CONF_NOTION_LOG_MODE = "notion_log_mode"
+
+NOTION_LOG_MODE_OFF = "off"
+NOTION_LOG_MODE_ALWAYS = "always"
+NOTION_LOG_MODE_LONG_ONLY = "long_only"
+NOTION_LOG_MODE_FAILURES = "failures_only"
+
+DEFAULT_NOTION_LOG_MODE = NOTION_LOG_MODE_OFF
+NOTION_API_URL = "https://api.notion.com/v1"
+NOTION_API_VERSION = "2022-06-28"
+NOTION_MAX_TEXT_CHARS = 2000  # Notion rich_text block limit
+
 # Failure notification settings
 CONF_FAILURE_NOTIFY_SERVICE = "failure_notify_service"
 CONF_FAILURE_NOTIFY_ENABLED = "failure_notify_enabled"
@@ -200,3 +215,26 @@ DEFAULT_AUTO_FIX_ENABLED = True
 
 CONF_SUBENTRY_TITLE = "title"
 SUBENTRY_TYPE_CONVERSATION = "conversation"
+
+# Joke de-duplication
+JOKE_HISTORY_LIMIT = 30  # track last N jokes
+JOKE_INJECT_LIMIT = 15   # inject last N into prompt as exclusions
+JOKE_REQUEST_KEYWORDS = [
+    "joke", "funny", "make me laugh", "tell me something funny",
+    "knock knock", "riddle", "pun",
+]
+
+# Shopping list prompt guidance (injected into system prompt when tools available)
+SHOPPING_LIST_GUIDANCE = (
+    "\n\n## Shopping List Management\n"
+    "You CAN manage the user's shopping list. Use these HA service calls:\n"
+    "- `shopping_list.add_item` with `name` field to add items\n"
+    "- `shopping_list.remove_item` with `name` field to remove a specific item\n"
+    "- `shopping_list.complete_item` with `name` field to check off an item\n"
+    "- `shopping_list.complete_all` (no fields) to check off ALL items\n"
+    "- `shopping_list.clear_completed_items` (no fields) to remove checked items\n"
+    "- To CLEAR the entire shopping list: call `shopping_list.complete_all` first, "
+    "then call `shopping_list.clear_completed_items`\n"
+    "- `todo.get_items` with entity_id `todo.shopping_list` to see current items\n"
+    "Always confirm what you did after making changes."
+)
