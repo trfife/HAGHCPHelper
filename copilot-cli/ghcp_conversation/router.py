@@ -56,24 +56,14 @@ _BUILTIN_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         re.IGNORECASE,
     ), "shopping_list_complete"),
 
-    # "clear/empty my shopping list"
+    # Reversed: "shopping list: add X" / "shopping list: remove X"
     (re.compile(
-        r"\b(clear|empty)\b.+\b(shopping\s*list|grocery\s*list)\b",
-        re.IGNORECASE,
-    ), "shopping_list_clear"),
-
-    # "what's on my shopping list?" / "show my shopping list"
-    (re.compile(
-        r"\b(what'?s|show|list|read|what\s+is)\b.+\b(shopping\s*list|grocery\s*list)\b",
-        re.IGNORECASE,
-    ), "shopping_list_query"),
-
-    # Reversed: "shopping list: add X"
-    (re.compile(
-        r"\b(shopping\s*list|grocery\s*list)\b.+"
-        r"\b(add|remove|clear|complete|delete|empty|what'?s\s+on|put)\b",
+        r"\b(shopping\s*list|grocery\s*list)\b.+\b(add|put|remove|delete|check\s+off)\b",
         re.IGNORECASE,
     ), "shopping_list_reversed"),
+
+    # NOTE: clear/query/show shopping list do NOT work with HA default agent.
+    # Those go to the LLM which has shopping list tools instead.
 
     # ── Timers (HassStartTimer, HassCancelTimer, etc.) ──────────────
     # "set a timer for 5 minutes" / "start a 10 minute timer"
