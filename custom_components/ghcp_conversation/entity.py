@@ -466,6 +466,7 @@ class GHCPConversationEntity(ConversationEntity):
             speech_text = plain.get("speech", "")
             if speech_text:
                 tag_map = {
+                    "builtin": "[HA]",
                     "local": "[HA]",
                     "azure": "[AZ]",
                     "cli": "[CLI]",
@@ -1150,7 +1151,28 @@ class GHCPConversationEntity(ConversationEntity):
         azure_failed = False
 
         try:
-            if decision.route == Route.LOCAL:
+            if decision.route == Route.BUILTIN:
+                # ── HA native intent (shopping list, todo) ────────────
+                # Pass through to HA's default conversation agent
+                from homeassistant.components.conversation import (
+                    async_converse,
+                )
+                if trace:
+                    trace.step("BUILTIN→HA default agent for native intent")
+                builtin_result = await async_converse(
+                    self.hass,
+                    user_input.text,
+                    conversation_id=user_input.conversation_id,
+                    context=user_input.context,
+                    language=user_input.language,
+                    agent_id="homeassistant",
+                )
+                if trace:
+                    resp = _extract_response_text(builtin_result)
+                    trace.step(f"HA response: '{resp[:80]}'")
+                return builtin_result
+
+            elif decision.route == Route.LOCAL:
                 # ── Fast local path: use Azure for tool-calling ──────────
                 router_endpoint = data.get(CONF_AZURE_ROUTER_ENDPOINT)
                 router_key = data.get(CONF_AZURE_ROUTER_KEY)

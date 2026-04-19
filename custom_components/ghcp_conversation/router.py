@@ -13,6 +13,7 @@ _LOGGER = logging.getLogger(__name__)
 class Route(str, Enum):
     """Routing destinations for conversation requests."""
 
+    BUILTIN = "builtin"  # HA native intents (shopping list, todo, etc.)
     LOCAL = "local"    # Direct HA tool call, no LLM needed
     AZURE = "azure"    # Fast Azure model for moderate queries
     CLI = "cli"        # Copilot CLI expert for complex tasks
@@ -37,6 +38,44 @@ class RouteDecision:
 
 # Display/navigation patterns — need LLM interpretation, route to AZURE.
 # Checked BEFORE LOCAL to prevent false matches on "show me" state queries.
+# ── Built-in HA intent patterns (shopping list, todo lists) ──────────
+# These match phrases that HA's native conversation agent handles via
+# intents (HassShoppingListAddItem, HassListAddItem, etc.).
+# Routed to the default agent — no LLM needed.
+_BUILTIN_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    # "add X to my shopping list" / "put X on the list"
+    (re.compile(
+        r"\b(add|put)\b.+\b(shopping\s*list|grocery\s*list|the\s+list)\b",
+        re.IGNORECASE,
+    ), "shopping_list_add"),
+
+    # "remove/delete/check off X from my shopping list"
+    (re.compile(
+        r"\b(remove|delete|check\s+off|cross\s+off|complete)\b.+"
+        r"\b(shopping\s*list|grocery\s*list)\b",
+        re.IGNORECASE,
+    ), "shopping_list_complete"),
+
+    # "clear/empty my shopping list"
+    (re.compile(
+        r"\b(clear|empty)\b.+\b(shopping\s*list|grocery\s*list)\b",
+        re.IGNORECASE,
+    ), "shopping_list_clear"),
+
+    # "what's on my shopping list?" / "show my shopping list"
+    (re.compile(
+        r"\b(what'?s|show|list|read|what\s+is)\b.+\b(shopping\s*list|grocery\s*list)\b",
+        re.IGNORECASE,
+    ), "shopping_list_query"),
+
+    # Reversed: "shopping list: add X"
+    (re.compile(
+        r"\b(shopping\s*list|grocery\s*list)\b.+"
+        r"\b(add|remove|clear|complete|delete|empty|what'?s\s+on|put)\b",
+        re.IGNORECASE,
+    ), "shopping_list_reversed"),
+]
+
 _AZURE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # Camera / video feed display
     (re.compile(
@@ -101,20 +140,6 @@ _LOCAL_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         re.IGNORECASE,
     ), "cover_control"),
 
-    # Shopping list management
-    (re.compile(
-        r"\b(add|remove|clear|complete|check\s+off|cross\s+off|delete|empty)"
-        r"\b.+\b(shopping\s*list|grocery\s*list)\b",
-        re.IGNORECASE,
-    ), "shopping_list"),
-
-    # Shopping list — reversed phrasing ("shopping list: add X")
-    (re.compile(
-        r"\b(shopping\s*list|grocery\s*list)\b.+"
-        r"\b(add|remove|clear|complete|delete|empty|what'?s\s+on)\b",
-        re.IGNORECASE,
-    ), "shopping_list"),
-
     # Simple state queries
     (re.compile(
         r"\b(what(?:'s| is| are)|what's|show me|tell me|get)\b.+"
@@ -129,12 +154,6 @@ _LOCAL_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         r"home|away|armed|disarmed|running|idle)\b\s*\??\s*$",
         re.IGNORECASE,
     ), "state_check"),
-
-    # "What's on my shopping list?"
-    (re.compile(
-        r"\b(what'?s|show|list|read)\b.+\b(shopping\s*list|grocery\s*list)\b",
-        re.IGNORECASE,
-    ), "shopping_list_query"),
 ]
 
 _CLI_PATTERNS: list[tuple[re.Pattern[str], str]] = [
@@ -191,13 +210,21 @@ _CLI_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 def classify_intent(prompt: str) -> RouteDecision:
     """Classify a user prompt and return a routing decision.
 
-    Check order: LOCAL → CLI → default to AZURE.
+    Check order: BUILTIN → AZURE display → LOCAL → CLI → default to AZURE.
     """
     text = prompt.strip()
     if not text:
         return RouteDecision(route=Route.AZURE, confidence=0.0)
 
-    # 1. Check AZURE display/navigation patterns first — prevent LOCAL false matches
+    # 1. Check BUILTIN patterns first — HA native intents (shopping list, todo)
+    for pattern, label in _BUILTIN_PATTERNS:
+        if pattern.search(text):
+            _LOGGER.debug("Router: BUILTIN match '%s' for: %s", label, text[:80])
+            return RouteDecision(
+                route=Route.BUILTIN, confidence=0.95, matched_pattern=label
+            )
+
+    # 2. Check AZURE display/navigation patterns — prevent LOCAL false matches
     for pattern, label in _AZURE_PATTERNS:
         if pattern.search(text):
             _LOGGER.debug("Router: AZURE match '%s' for: %s", label, text[:80])
