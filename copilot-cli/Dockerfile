@@ -23,6 +23,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
     nodejs \
     npm \
+    xclip \
+    xvfb \
     && rm -rf /var/lib/apt/lists/*
 
 # Pre-install Memory MCP server globally (persistent knowledge graph)

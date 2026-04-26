@@ -746,10 +746,18 @@ fi
 # Write environment file for tmux sessions
 # -------------------------------------------------------
 ENV_FILE=/data/copilot-env.sh
+
+# Start virtual framebuffer for clipboard support (xclip needs a DISPLAY)
+if command -v Xvfb > /dev/null 2>&1; then
+    Xvfb :99 -screen 0 1x1x8 -nolisten tcp > /dev/null 2>&1 &
+    bashio::log.info "Started Xvfb on DISPLAY=:99 for clipboard support"
+fi
+
 cat > "${ENV_FILE}" << ENVEOF
 export TERM=xterm-256color
 export LANG=C.UTF-8
 export SHELL=/bin/bash
+export DISPLAY=:99
 export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:\${PATH}"
 ENVEOF
 

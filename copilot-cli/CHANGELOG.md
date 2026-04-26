@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.9.5
+
+- **Clipboard support** — added `xclip` and `xvfb` to container image. Startup script launches a virtual framebuffer (`Xvfb :99`) and exports `DISPLAY=:99` so the Copilot CLI clipboard integration works in the headless container. Fixes "clipboard utility not found" errors when copying text.
+
 ## 3.9.4
 
 - **Always yolo + resume** — CLI terminal now always starts with `--yolo --continue` flags, automatically resuming the last session with all permissions enabled. Removes the need for the `auto_approve` toggle (default changed to true).
